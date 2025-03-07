@@ -144,7 +144,7 @@
         <div id="report-content" style="display: none;">
             <div class="row">
                 <!-- 左侧面板：统计信息和场景列表 -->
-                <div class="col-md-6 left-panel">
+                <div class="col-md-5 left-panel">
                     <div class="row summary-stats mb-4">
                         <div class="col-md-4">
                             <div class="stat-card bg-light" onclick="filterScenesByStatus('all')">
@@ -169,9 +169,16 @@
                 </div>
                 
                 <!-- 右侧面板：图表 -->
-                <div class="col-md-6 right-panel">
-                    <!-- 右上：环形图 -->
-                    <div class="chart-container">
+                <div class="col-md-7 right-panel">
+                    <!-- 右上：历史趋势图 -->
+                    <div class="chart-container" style="height: 350px;">
+                        <div class="chart-title">历史趋势图</div>
+                        <canvas id="history-chart"></canvas>
+                        <div id="history-tooltip" class="tooltip-container"></div>
+                    </div>
+                    
+                    <!-- 右中：环形图 -->
+                    <div class="chart-container" style="height: 250px;">
                         <div class="chart-title">场景状态分布</div>
                         <canvas id="status-chart"></canvas>
                         <div id="chart-tooltip" class="tooltip-container"></div>
@@ -182,13 +189,6 @@
                         <div class="chart-title">场景耗时分布</div>
                         <canvas id="duration-chart"></canvas>
                         <div id="duration-tooltip" class="tooltip-container"></div>
-                    </div>
-                    
-                    <!-- 右下方：历史趋势图 -->
-                    <div class="chart-container">
-                        <div class="chart-title">历史趋势图</div>
-                        <canvas id="history-chart"></canvas>
-                        <div id="history-tooltip" class="tooltip-container"></div>
                     </div>
                 </div>
             </div>

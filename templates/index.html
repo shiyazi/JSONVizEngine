@@ -6,6 +6,7 @@
     <title>测试报告可视化</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .success-badge {
             background-color: #28a745;
@@ -81,11 +82,57 @@
             padding: 15px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        .chart-container {
+            height: 300px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #fff;
+        }
+        .left-panel {
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+        .right-panel {
+            height: calc(100vh - 100px);
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-title {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .skipped-badge {
+            background-color: #ffc107;
+            color: white;
+        }
+        .step-skipped {
+            background-color: rgba(255, 193, 7, 0.05);
+            border-left: 3px solid #ffc107;
+        }
+        .tooltip-container {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="container mt-4 mb-5">
+    <div class="container-fluid mt-4 mb-5">
         <h1 class="text-center mb-4">测试报告可视化</h1>
         
         <div id="loading" class="loading">
@@ -95,33 +142,481 @@
         </div>
 
         <div id="report-content" style="display: none;">
-            <div class="row summary-stats mb-4">
-                <div class="col-md-4">
-                    <div class="stat-card bg-light">
-                        <h3 id="total-scenes">0</h3>
-                        <p class="mb-0">总场景数</p>
+            <div class="row">
+                <!-- 左侧面板：统计信息和场景列表 -->
+                <div class="col-md-6 left-panel">
+                    <div class="row summary-stats mb-4">
+                        <div class="col-md-4">
+                            <div class="stat-card bg-light" onclick="filterScenesByStatus('all')">
+                                <h3 id="total-scenes">0</h3>
+                                <p class="mb-0">总场景数</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-card bg-success bg-opacity-10" onclick="filterScenesByStatus(1)">
+                                <h3 id="success-scenes">0</h3>
+                                <p class="mb-0">成功场景数</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-card bg-danger bg-opacity-10" onclick="filterScenesByStatus(0)">
+                                <h3 id="failed-scenes">0</h3>
+                                <p class="mb-0">失败场景数</p>
+                            </div>
+                        </div>
                     </div>
+                    <div id="scenes-container"></div>
                 </div>
-                <div class="col-md-4">
-                    <div class="stat-card bg-success bg-opacity-10">
-                        <h3 id="success-scenes">0</h3>
-                        <p class="mb-0">成功场景数</p>
+                
+                <!-- 右侧面板：图表 -->
+                <div class="col-md-6 right-panel">
+                    <!-- 右上：环形图 -->
+                    <div class="chart-container">
+                        <div class="chart-title">场景状态分布</div>
+                        <canvas id="status-chart"></canvas>
+                        <div id="chart-tooltip" class="tooltip-container"></div>
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="stat-card bg-danger bg-opacity-10">
-                        <h3 id="failed-scenes">0</h3>
-                        <p class="mb-0">失败场景数</p>
+                    
+                    <!-- 右下：条形图 -->
+                    <div class="chart-container">
+                        <div class="chart-title">场景耗时分布</div>
+                        <canvas id="duration-chart"></canvas>
+                        <div id="duration-tooltip" class="tooltip-container"></div>
                     </div>
                 </div>
             </div>
-
-            <div id="scenes-container"></div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 全局变量，用于存储场景数据和图表实例
+        let allScenes = [];
+        let statusChart = null;
+        let durationChart = null;
+
+        // 初始化环形图
+        function initStatusChart(sceneResults) {
+            const successCount = sceneResults.filter(scene => scene.is_success === 1).length;
+            const failureCount = sceneResults.filter(scene => scene.is_success === 0).length;
+            const skippedCount = sceneResults.filter(scene => scene.is_success === 2).length;
+            const total = sceneResults.length;
+            const successRate = total > 0 ? Math.round((successCount / total) * 100) : 0;
+
+            const ctx = document.getElementById('status-chart').getContext('2d');
+            statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['成功', '失败', '跳过'],
+                    datasets: [{
+                        data: [successCount, failureCount, skippedCount],
+                        backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const status = index === 0 ? 1 : (index === 1 ? 0 : 2);
+                            filterScenesByStatus(status);
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: function(chart) {
+                        const width = chart.width;
+                        const height = chart.height;
+                        const ctx = chart.ctx;
+                        
+                        ctx.restore();
+                        ctx.font = 'bold 24px Arial';
+                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = 'center';
+                        
+                        const text = `${successRate}%`;
+                        const textX = width / 2;
+                        const textY = height / 2;
+                        
+                        ctx.fillStyle = '#333';
+                        ctx.fillText(text, textX, textY);
+                        
+                        ctx.font = '14px Arial';
+                        ctx.fillText('成功率', textX, textY + 25);
+                        ctx.save();
+                    }
+                }],
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: function(chart) {
+                        const width = chart.width;
+                        const height = chart.height;
+                        const ctx = chart.ctx;
+                        
+                        ctx.restore();
+                        ctx.font = 'bold 24px Arial';
+                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = 'center';
+                        
+                        const text = `${successRate}%`;
+                        const textX = width / 2;
+                        const textY = height / 2;
+                        
+                        ctx.fillStyle = '#333';
+                        ctx.fillText(text, textX, textY);
+                        
+                        ctx.font = '14px Arial';
+                        ctx.fillText('成功率', textX, textY + 25);
+                        ctx.save();
+                    }
+                }]
+            });
+        }
+
+        // 初始化条形图
+        function initDurationChart(sceneResults) {
+            // 计算场景耗时分布
+            const durations = sceneResults.map(scene => {
+                let totalDuration = 0;
+                if (Array.isArray(scene.scene_result)) {
+                    totalDuration = scene.scene_result.reduce((sum, step) => sum + (step.duration || 0), 0);
+                }
+                return totalDuration;
+            });
+        
+            // 创建耗时区间
+            const intervals = [0, 1, 2, 5, 10, 20, 50];
+            const counts = new Array(intervals.length).fill(0);
+            const scenesInInterval = new Array(intervals.length).fill().map(() => []);
+        
+            durations.forEach((duration, index) => {
+                for (let i = 0; i < intervals.length; i++) {
+                    const nextInterval = intervals[i + 1] || Infinity;
+                    if (duration >= intervals[i] && duration < nextInterval) {
+                        counts[i]++;
+                        scenesInInterval[i].push(sceneResults[index]);
+                        break;
+                    }
+                }
+            });
+        
+            const labels = intervals.map((val, i) => {
+                const nextVal = intervals[i + 1];
+                return nextVal ? `${val}-${nextVal}秒` : `>${val}秒`;
+            });
+        
+            const ctx = document.getElementById('duration-chart').getContext('2d');
+            durationChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: '#4a90e2',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    return `场景数量: ${context.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            showDetailChart(scenesInInterval[index], labels[index]);
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            },
+                            title: {
+                                display: true,
+                                text: '场景数量'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '耗时区间'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 显示详细场景图表
+        function showDetailChart(scenes, intervalLabel) {
+            // 隐藏原条形图，显示详细图表
+            document.getElementById('detail-chart-container').style.display = 'block';
+            
+            // 准备数据
+            const sceneNames = scenes.map(scene => scene.scene_name || '未命名场景');
+            const durations = scenes.map(scene => {
+                let totalDuration = 0;
+                if (Array.isArray(scene.scene_result)) {
+                    totalDuration = scene.scene_result.reduce((sum, step) => sum + (step.duration || 0), 0);
+                }
+                return totalDuration;
+            });
+            
+            // 创建详细图表
+            const ctx = document.getElementById('detail-chart').getContext('2d');
+            if (window.detailChart) {
+                window.detailChart.destroy();
+            }
+            
+            document.querySelector('#detail-chart-container .chart-title').textContent = `${intervalLabel} 时间区间内的场景详情`;
+            
+            window.detailChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sceneNames,
+                    datasets: [{
+                        label: '耗时(秒)',
+                        data: durations,
+                        backgroundColor: scenes.map(scene => scene.is_success === 1 ? '#28a745' : (scene.is_success === 2 ? '#ffc107' : '#dc3545')),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `耗时: ${context.raw.toFixed(2)}秒`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '耗时(秒)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '场景名称'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 隐藏详细图表
+        function hideDetailChart() {
+            document.getElementById('detail-chart-container').style.display = 'none';
+        }
+
+        // 根据状态筛选场景
+        function filterScenesByStatus(status) {
+            const filteredScenes = status === 'all' ? allScenes : allScenes.filter(scene => scene.is_success === status);
+            const scenesContainer = document.getElementById('scenes-container');
+            scenesContainer.innerHTML = '';
+            filteredScenes.forEach((scene, index) => renderScene(scene, index, scenesContainer));
+        }
+
+        // 渲染报告
+        function renderReport(data) {
+            const sceneResults = data.scene_result || [];
+            allScenes = sceneResults;
+
+            // 更新统计信息
+            document.getElementById('total-scenes').textContent = sceneResults.length;
+            const successScenes = sceneResults.filter(scene => scene.is_success === 1).length;
+            document.getElementById('success-scenes').textContent = successScenes;
+            document.getElementById('failed-scenes').textContent = sceneResults.length - successScenes;
+
+            // 初始化图表
+            initStatusChart(sceneResults);
+            initDurationChart(sceneResults);
+
+            // 渲染场景列表
+            const scenesContainer = document.getElementById('scenes-container');
+            sceneResults.forEach((scene, index) => renderScene(scene, index, scenesContainer));
+        }
+
+        // 渲染单个场景
+        function renderScene(scene, index, container) {
+            const sceneCard = document.createElement('div');
+            sceneCard.className = 'scene-card';
+            
+            const isSuccess = scene.is_success === 1;
+            const isSkipped = scene.is_success === 2;
+            const headerClass = isSuccess ? 'success-header' : (isSkipped ? 'skipped-header' : 'failure-header');
+            const badgeClass = isSuccess ? 'success-badge' : (isSkipped ? 'skipped-badge' : 'failure-badge');
+            
+            const sceneName = scene.scene_name || `场景 ${index + 1}`;
+            const sceneType = scene.scene_type || '场景';
+            
+            // 计算场景总耗时
+            let totalDuration = 0;
+            if (Array.isArray(scene.scene_result)) {
+                totalDuration = scene.scene_result.reduce((sum, step) => sum + (step.duration || 0), 0);
+            }
+            
+            sceneCard.innerHTML = `
+                <div class="scene-header ${headerClass}" data-bs-toggle="collapse" data-bs-target="#scene-${index}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : (isSkipped ? '跳过' : '失败')}</span>
+                            <strong>${sceneName}</strong> <small class="text-muted">(${sceneType})</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">${totalDuration}秒</span>
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="collapse scene-body" id="scene-${index}">
+                    ${renderSceneDetails(scene, index)}
+                </div>
+            `;
+            
+            container.appendChild(sceneCard);
+        }
+        
+        // 渲染场景详情
+        function renderSceneDetails(scene, sceneIndex) {
+            if (!Array.isArray(scene.scene_result)) {
+                return `<div class="alert alert-info">无详细步骤信息</div>`;
+            }
+            
+            let html = '<div class="steps-container">';
+            
+            scene.scene_result.forEach((step, stepIndex) => {
+                const isStepSuccess = step.is_success === 1;
+                const isStepSkipped = step.is_success === 2;
+                const stepClass = isStepSuccess ? 'step-success' : (isStepSkipped ? 'step-skipped' : 'step-failure');
+                const stepName = step.step_name || `步骤 ${stepIndex + 1}`;
+                const duration = step.duration || 0;
+                
+                html += `
+                    <div class="step-item ${stepClass}" data-bs-toggle="collapse" data-bs-target="#step-${sceneIndex}-${stepIndex}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi ${isStepSuccess ? 'bi-check-circle-fill text-success' : (isStepSkipped ? 'bi-exclamation-circle-fill text-warning' : 'bi-x-circle-fill text-danger')}"></i>
+                                <span class="ms-2">${stepName}</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary">${duration}秒</span>
+                                <i class="bi bi-chevron-down ms-2"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="collapse step-details" id="step-${sceneIndex}-${stepIndex}">
+                        ${renderStepDetails(step)}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            return html;
+        }
+        
+        // 渲染步骤详情
+        function renderStepDetails(step) {
+            let html = '<div class="row">';
+            
+            // 请求信息
+            html += '<div class="col-md-6">';
+            html += '<h6>请求信息</h6>';
+            html += `<p><strong>路径:</strong> ${step.path || 'N/A'}</p>`;
+            html += `<p><strong>方法:</strong> ${step.method || 'N/A'}</p>`;
+            html += `<p><strong>耗时:</strong> ${step.duration || 0}秒</p>`;
+            
+            // 查询参数
+            if (step.query) {
+                html += '<h6>查询参数</h6>';
+                html += `<pre>${JSON.stringify(step.query, null, 2)}</pre>`;
+            }
+            
+            // 表单数据
+            if (step.form_data) {
+                html += '<h6>表单数据</h6>';
+                html += `<pre>${JSON.stringify(step.form_data, null, 2)}</pre>`;
+            }
+            
+            // 请求体
+            if (step.body) {
+                html += '<h6>请求体</h6>';
+                html += `<pre>${JSON.stringify(step.body, null, 2)}</pre>`;
+            }
+            
+            html += '</div>';
+            
+            // 响应信息
+            html += '<div class="col-md-6">';
+            html += '<h6>响应信息</h6>';
+            
+            if (step.error_msg) {
+                html += `<div class="alert alert-danger">${step.error_msg}</div>`;
+            } else if (step.response) {
+                try {
+                    const responseStr = typeof step.response === 'object' ? 
+                        JSON.stringify(step.response, null, 2) : String(step.response);
+                    html += `<pre>${responseStr}</pre>`;
+                } catch (e) {
+                    html += `<pre>${step.response}</pre>`;
+                }
+            } else {
+                html += '<p>无响应数据</p>';
+            }
+            
+            html += '</div>';
+            html += '</div>';
+            
+            return html;
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
             // 获取数据
             fetch('/api/data')
@@ -135,179 +630,6 @@
                     document.getElementById('loading').innerHTML = `<div class="alert alert-danger">加载数据失败: ${error}</div>`;
                 });
         });
-
-        function renderReport(data) {
-            const scenesContainer = document.getElementById('scenes-container');
-            const sceneResults = data.scene_result || [];
-            
-            // 更新统计信息
-            document.getElementById('total-scenes').textContent = sceneResults.length;
-            const successScenes = sceneResults.filter(scene => scene.is_success === 1).length;
-            document.getElementById('success-scenes').textContent = successScenes;
-            document.getElementById('failed-scenes').textContent = sceneResults.length - successScenes;
-            
-            // 渲染每个场景
-            sceneResults.forEach((scene, index) => {
-                const sceneCard = document.createElement('div');
-                sceneCard.className = 'scene-card';
-                
-                const isSuccess = scene.is_success === 1;
-                const headerClass = isSuccess ? 'success-header' : 'failure-header';
-                const badgeClass = isSuccess ? 'success-badge' : 'failure-badge';
-                
-                // 场景标题
-                const sceneHeader = document.createElement('div');
-                sceneHeader.className = `scene-header ${headerClass} d-flex justify-content-between align-items-center`;
-                sceneHeader.innerHTML = `
-                    <div>
-                        <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : '失败'}</span>
-                        <strong>${scene.scene_name || `场景 ${index + 1}`}</strong>
-                    </div>
-                    <i class="bi bi-chevron-down"></i>
-                `;
-                
-                // 场景内容容器
-                const sceneBody = document.createElement('div');
-                sceneBody.className = 'scene-body';
-                sceneBody.style.display = 'none'; // 默认折叠
-                
-                // 处理场景内的结果
-                if (scene.scene_result && Array.isArray(scene.scene_result)) {
-                    renderSceneResults(scene.scene_result, sceneBody);
-                } else if (scene.error_msg) {
-                    sceneBody.innerHTML = `<div class="alert alert-danger">${scene.error_msg}</div>`;
-                }
-                
-                // 添加点击事件
-                sceneHeader.addEventListener('click', function() {
-                    const isVisible = sceneBody.style.display === 'block';
-                    sceneBody.style.display = isVisible ? 'none' : 'block';
-                    sceneHeader.querySelector('i').className = isVisible ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
-                });
-                
-                sceneCard.appendChild(sceneHeader);
-                sceneCard.appendChild(sceneBody);
-                scenesContainer.appendChild(sceneCard);
-            });
-        }
-
-        function renderSceneResults(results, container) {
-            results.forEach((result, index) => {
-                // 检查是否是嵌套场景
-                if (result.scene_result && Array.isArray(result.scene_result)) {
-                    const nestedSceneDiv = document.createElement('div');
-                    nestedSceneDiv.className = 'nested-scene mb-3';
-                    
-                    const isSuccess = result.is_success === 1;
-                    const headerClass = isSuccess ? 'success-header' : 'failure-header';
-                    const badgeClass = isSuccess ? 'success-badge' : 'failure-badge';
-                    
-                    nestedSceneDiv.innerHTML = `
-                        <div class="scene-header ${headerClass} d-flex justify-content-between align-items-center">
-                            <div>
-                                <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : '失败'}</span>
-                                <strong>${result.scene_name || `子场景 ${index + 1}`}</strong>
-                            </div>
-                            <i class="bi bi-chevron-down"></i>
-                        </div>
-                        <div class="scene-body" style="display: none;"></div>
-                    `;
-                    
-                    const nestedBody = nestedSceneDiv.querySelector('.scene-body');
-                    renderSceneResults(result.scene_result, nestedBody);
-                    
-                    nestedSceneDiv.querySelector('.scene-header').addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        const body = this.nextElementSibling;
-                        const isVisible = body.style.display === 'block';
-                        body.style.display = isVisible ? 'none' : 'block';
-                        this.querySelector('i').className = isVisible ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
-                    });
-                    
-                    container.appendChild(nestedSceneDiv);
-                } else {
-                    // 普通步骤
-                    renderStep(result, container, index);
-                }
-            });
-        }
-
-        function renderStep(step, container, index) {
-            const isSuccess = step.is_success === 1;
-            const stepClass = isSuccess ? 'step-success' : 'step-failure';
-            const badgeClass = isSuccess ? 'success-badge' : 'failure-badge';
-            
-            const stepDiv = document.createElement('div');
-            stepDiv.className = `step-item ${stepClass} mb-2`;
-            stepDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : '失败'}</span>
-                        <span>${step.step_name || step.path || `步骤 ${index + 1}`}</span>
-                    </div>
-                    <i class="bi bi-chevron-down"></i>
-                </div>
-            `;
-            
-            // 步骤详情
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'step-details';
-            detailsDiv.style.display = 'none';
-            
-            // 构建详情内容
-            let detailsContent = '';
-            
-            if (step.path) {
-                detailsContent += `<p><strong>路径:</strong> ${step.path}</p>`;
-            }
-            
-            if (step.method) {
-                detailsContent += `<p><strong>方法:</strong> ${step.method}</p>`;
-            }
-            
-            if (step.step_type) {
-                detailsContent += `<p><strong>类型:</strong> ${step.step_type}</p>`;
-            }
-            
-            if (step.duration !== undefined) {
-                detailsContent += `<p><strong>耗时:</strong> ${step.duration}秒</p>`;
-            }
-            
-            // 显示响应数据
-            if (step.response) {
-                detailsContent += `<p><strong>响应:</strong></p>`;
-                detailsContent += `<pre>${typeof step.response === 'object' ? JSON.stringify(step.response, null, 2) : step.response}</pre>`;
-            }
-            
-            // 显示请求数据
-            if (step.body) {
-                detailsContent += `<p><strong>请求体:</strong></p>`;
-                detailsContent += `<pre>${typeof step.body === 'object' ? JSON.stringify(step.body, null, 2) : step.body}</pre>`;
-            }
-            
-            if (step.query) {
-                detailsContent += `<p><strong>查询参数:</strong></p>`;
-                detailsContent += `<pre>${typeof step.query === 'object' ? JSON.stringify(step.query, null, 2) : step.query}</pre>`;
-            }
-            
-            // 显示错误信息
-            if (step.error_msg) {
-                detailsContent += `<p><strong>错误信息:</strong></p>`;
-                detailsContent += `<pre class="text-danger">${step.error_msg}</pre>`;
-            }
-            
-            detailsDiv.innerHTML = detailsContent;
-            
-            // 添加点击事件
-            stepDiv.addEventListener('click', function() {
-                const isVisible = detailsDiv.style.display === 'block';
-                detailsDiv.style.display = isVisible ? 'none' : 'block';
-                stepDiv.querySelector('i').className = isVisible ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
-            });
-            
-            stepDiv.appendChild(detailsDiv);
-            container.appendChild(stepDiv);
-        }
     </script>
 </body>
 </html>

@@ -3,8 +3,14 @@ import json
 import os
 import re
 from datetime import datetime
+from flask_socketio import SocketIO
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import threading
+import time
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 @app.route('/')
 def index():
@@ -18,6 +24,41 @@ def get_data():
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# 文件监控类，用于监控result目录下的文件变动
+class ResultFileHandler(FileSystemEventHandler):
+    def __init__(self):
+        self.last_modified = time.time()
+    
+    def on_modified(self, event):
+        if event.is_directory:
+            return
+        
+        # 防止短时间内多次触发
+        if time.time() - self.last_modified < 1:
+            return
+        self.last_modified = time.time()
+        
+        # 检查是否是JSON文件
+        if event.src_path.endswith('.json'):
+            print(f"检测到文件变动: {event.src_path}")
+            # 通过WebSocket发送更新通知
+            socketio.emit('data_updated', {'file': event.src_path, 'timestamp': time.time()})
+
+# 启动文件监控
+def start_file_monitor():
+    event_handler = ResultFileHandler()
+    observer = Observer()
+    # 监控result目录
+    observer.schedule(event_handler, 'result', recursive=True)
+    observer.start()
+    print("文件监控已启动，监控result目录下的文件变动")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
 
 @app.route('/api/history')
 def get_history_data():
@@ -85,4 +126,10 @@ def get_history_data():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 在单独的线程中启动文件监控
+    monitor_thread = threading.Thread(target=start_file_monitor)
+    monitor_thread.daemon = True  # 设置为守护线程，这样主程序退出时，监控线程也会退出
+    monitor_thread.start()
+    
+    # 使用socketio启动应用
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)

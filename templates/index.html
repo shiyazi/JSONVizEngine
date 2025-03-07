@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>测试报告可视化</title>
+    <title>测试报告</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -133,7 +133,7 @@
 </head>
 <body>
     <div class="container-fluid mt-4 mb-5">
-        <h1 class="text-center mb-4">测试报告可视化</h1>
+        <h1 class="text-center mb-4">自动化测试报告</h1>
         
         <div id="loading" class="loading">
             <div class="spinner-border text-primary" role="status">
@@ -177,18 +177,18 @@
                         <div id="chart-tooltip" class="tooltip-container"></div>
                     </div>
                     
-                    <!-- 右下：条形图 -->
-                    <div class="chart-container">
-                        <div class="chart-title">场景耗时分布</div>
-                        <canvas id="duration-chart"></canvas>
-                        <div id="duration-tooltip" class="tooltip-container"></div>
-                    </div>
-                    
-                    <!-- 右下方：历史趋势图 -->
+                    <!-- 右下：历史趋势图 -->
                     <div class="chart-container">
                         <div class="chart-title">历史趋势图</div>
                         <canvas id="history-chart"></canvas>
                         <div id="history-tooltip" class="tooltip-container"></div>
+                    </div>
+                    
+                    <!-- 右下方：场景耗时条形图 -->
+                    <div class="chart-container">
+                        <div class="chart-title">场景耗时分布</div>
+                        <canvas id="duration-chart"></canvas>
+                        <div id="duration-tooltip" class="tooltip-container"></div>
                     </div>
                 </div>
             </div>
@@ -196,6 +196,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.min.js"></script>
     <script>
         // 全局变量，用于存储场景数据和图表实例
         let allScenes = [];
@@ -625,28 +626,67 @@
             return html;
         }
         
-        document.addEventListener('DOMContentLoaded', function() {
-            // 获取数据
+        // 添加刷新数据的函数
+        function refreshData() {
+            console.log('正在刷新数据...');
+            document.getElementById('loading').style.display = 'flex';
+            
+            // 获取最新数据
             fetch('/api/data')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('report-content').style.display = 'block';
+                    
+                    // 清除旧图表
+                    if (statusChart) statusChart.destroy();
+                    if (durationChart) durationChart.destroy();
+                    
+                    // 重新渲染报告
                     renderReport(data);
                 })
                 .catch(error => {
                     document.getElementById('loading').innerHTML = `<div class="alert alert-danger">加载数据失败: ${error}</div>`;
                 });
                 
-            // 获取历史数据并绘制趋势图
+            // 获取最新历史数据
             fetch('/api/history')
                 .then(response => response.json())
                 .then(data => {
+                    if (historyChart) historyChart.destroy();
                     initHistoryChart(data);
                 })
                 .catch(error => {
                     console.error('加载历史数据失败:', error);
                 });
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始加载数据
+            refreshData();
+            
+            // 连接WebSocket
+            const socket = io();
+            
+            // 监听文件变动事件
+            socket.on('data_updated', function(data) {
+                console.log('收到文件变动通知:', data);
+                // 自动刷新数据
+                refreshData();
+            });
+            
+            // 添加手动刷新按钮
+            const reportHeader = document.querySelector('h1.text-center');
+            const refreshButton = document.createElement('button');
+            refreshButton.className = 'btn btn-primary position-absolute';
+            refreshButton.style.right = '20px';
+            refreshButton.style.top = '20px';
+            refreshButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新数据';
+            refreshButton.addEventListener('click', refreshData);
+            
+            // 将按钮添加到页面
+            reportHeader.parentNode.style.position = 'relative';
+            reportHeader.parentNode.appendChild(refreshButton);
         });
         
         // 初始化历史趋势图

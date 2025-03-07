@@ -96,6 +96,12 @@
             padding: 15px;
             background-color: #fff;
         }
+        .history-chart-container {
+            height: 350px;
+        }
+        .status-chart-container {
+            height: 250px;
+        }
         .left-panel {
             height: calc(100vh - 100px);
             overflow-y: auto;
@@ -144,7 +150,7 @@
         <div id="report-content" style="display: none;">
             <div class="row">
                 <!-- 左侧面板：统计信息和场景列表 -->
-                <div class="col-md-6 left-panel">
+                <div class="col-md-5 left-panel">
                     <div class="row summary-stats mb-4">
                         <div class="col-md-4">
                             <div class="stat-card bg-light" onclick="filterScenesByStatus('all')">
@@ -169,19 +175,19 @@
                 </div>
                 
                 <!-- 右侧面板：图表 -->
-                <div class="col-md-6 right-panel">
-                    <!-- 右上：环形图 -->
-                    <div class="chart-container">
-                        <div class="chart-title">场景状态分布</div>
-                        <canvas id="status-chart"></canvas>
-                        <div id="chart-tooltip" class="tooltip-container"></div>
-                    </div>
-                    
-                    <!-- 右下：历史趋势图 -->
-                    <div class="chart-container">
+                <div class="col-md-7 right-panel">
+                    <!-- 右上：历史趋势图 -->
+                    <div class="chart-container history-chart-container">
                         <div class="chart-title">历史趋势图</div>
                         <canvas id="history-chart"></canvas>
                         <div id="history-tooltip" class="tooltip-container"></div>
+                    </div>
+                    
+                    <!-- 右中：环形图 -->
+                    <div class="chart-container status-chart-container">
+                        <div class="chart-title">场景状态分布</div>
+                        <canvas id="status-chart"></canvas>
+                        <div id="chart-tooltip" class="tooltip-container"></div>
                     </div>
                     
                     <!-- 右下方：场景耗时条形图 -->
@@ -698,7 +704,14 @@
             // 按时间戳排序
             historyData.sort((a, b) => a.timestamp - b.timestamp);
             
-            const labels = historyData.map(item => item.date);
+            // 修改日期格式，只显示到分钟，不显示秒
+            const labels = historyData.map(item => {
+                // 如果日期格式是 YYYY-MM-DD HH:MM:SS，则截取掉秒的部分
+                if (item.date && item.date.length === 19) {
+                    return item.date.substring(0, 16); // 只保留到分钟 YYYY-MM-DD HH:MM
+                }
+                return item.date;
+            });
             const successData = historyData.map(item => item.success);
             const failureData = historyData.map(item => item.failure);
             const skippedData = historyData.map(item => item.skipped);

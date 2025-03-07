@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试报告可视化</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        .success-badge {
+            background-color: #28a745;
+            color: white;
+        }
+        .failure-badge {
+            background-color: #dc3545;
+            color: white;
+        }
+        .scene-card {
+            margin-bottom: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .scene-header {
+            cursor: pointer;
+            padding: 10px 15px;
+            border-radius: 5px 5px 0 0;
+        }
+        .success-header {
+            background-color: rgba(40, 167, 69, 0.1);
+            border-left: 5px solid #28a745;
+        }
+        .failure-header {
+            background-color: rgba(220, 53, 69, 0.1);
+            border-left: 5px solid #dc3545;
+        }
+        .scene-body {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .step-item {
+            padding: 8px 15px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .step-success {
+            background-color: rgba(40, 167, 69, 0.05);
+            border-left: 3px solid #28a745;
+        }
+        .step-failure {
+            background-color: rgba(220, 53, 69, 0.05);
+            border-left: 3px solid #dc3545;
+        }
+        .step-details {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+            font-size: 0.9rem;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
+        }
+        .summary-stats {
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4 mb-5">
+        <h1 class="text-center mb-4">测试报告可视化</h1>
+        
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+        </div>
+
+        <div id="report-content" style="display: none;">
+            <div class="row summary-stats mb-4">
+                <div class="col-md-4">
+                    <div class="stat-card bg-light">
+                        <h3 id="total-scenes">0</h3>
+                        <p class="mb-0">总场景数</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card bg-success bg-opacity-10">
+                        <h3 id="success-scenes">0</h3>
+                        <p class="mb-0">成功场景数</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card bg-danger bg-opacity-10">
+                        <h3 id="failed-scenes">0</h3>
+                        <p class="mb-0">失败场景数</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="scenes-container"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取数据
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('report-content').style.display = 'block';
+                    renderReport(data);
+                })
+                .catch(error => {
+                    document.getElementById('loading').innerHTML = `<div class="alert alert-danger">加载数据失败: ${error}</div>`;
+                });
+        });
+
+        function renderReport(data) {
+            const scenesContainer = document.getElementById('scenes-container');
+            const sceneResults = data.scene_result || [];
+            
+            // 更新统计信息
+            document.getElementById('total-scenes').textContent = sceneResults.length;
+            const successScenes = sceneResults.filter(scene => scene.is_success === 1).length;
+            document.getElementById('success-scenes').textContent = successScenes;
+            document.getElementById('failed-scenes').textContent = sceneResults.length - successScenes;
+            
+            // 渲染每个场景
+            sceneResults.forEach((scene, index) => {
+                const sceneCard = document.createElement('div');
+                sceneCard.className = 'scene-card';
+                
+                const isSuccess = scene.is_success === 1;
+                const headerClass = isSuccess ? 'success-header' : 'failure-header';
+                const badgeClass = isSuccess ? 'success-badge' : 'failure-badge';
+                
+                // 场景标题
+                const sceneHeader = document.createElement('div');
+                sceneHeader.className = `scene-header ${headerClass} d-flex justify-content-between align-items-center`;
+                sceneHeader.innerHTML = `
+                    <div>
+                        <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : '失败'}</span>
+                        <strong>${scene.scene_name || `场景 ${index + 1}`}</strong>
+                    </div>
+                    <i class="bi bi-chevron-down"></i>
+                `;
+                
+                // 场景内容容器
+                const sceneBody = document.createElement('div');
+                sceneBody.className = 'scene-body';
+                sceneBody.style.display = 'none'; // 默认折叠
+                
+                // 处理场景内的结果
+                if (scene.scene_result && Array.isArray(scene.scene_result)) {
+                    renderSceneResults(scene.scene_result, sceneBody);
+                } else if (scene.error_msg) {
+                    sceneBody.innerHTML = `<div class="alert alert-danger">${scene.error_msg}</div>`;
+                }
+                
+                // 添加点击事件
+                sceneHeader.addEventListener('click', function() {
+                    const isVisible = sceneBody.style.display === 'block';
+                    sceneBody.style.display = isVisible ? 'none' : 'block';
+                    sceneHeader.querySelector('i').className = isVisible ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+                });
+                
+                sceneCard.appendChild(sceneHeader);
+                sceneCard.appendChild(sceneBody);
+                scenesContainer.appendChild(sceneCard);
+            });
+        }
+
+        function renderSceneResults(results, container) {
+            results.forEach((result, index) => {
+                // 检查是否是嵌套场景
+                if (result.scene_result && Array.isArray(result.scene_result)) {
+                    const nestedSceneDiv = document.createElement('div');
+                    nestedSceneDiv.className = 'nested-scene mb-3';
+                    
+                    const isSuccess = result.is_success === 1;
+                    const headerClass = isSuccess ? 'success-header' : 'failure-header';
+                    const badgeClass = isSuccess ? 'success-badge' : 'failure-badge';
+                    
+                    nestedSceneDiv.innerHTML = `
+                        <div class="scene-header ${headerClass} d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : '失败'}</span>
+                                <strong>${result.scene_name || `子场景 ${index + 1}`}</strong>
+                            </div>
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                        <div class="scene-body" style="display: none;"></div>
+                    `;
+                    
+                    const nestedBody = nestedSceneDiv.querySelector('.scene-body');
+                    renderSceneResults(result.scene_result, nestedBody);
+                    
+                    nestedSceneDiv.querySelector('.scene-header').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const body = this.nextElementSibling;
+                        const isVisible = body.style.display === 'block';
+                        body.style.display = isVisible ? 'none' : 'block';
+                        this.querySelector('i').className = isVisible ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+                    });
+                    
+                    container.appendChild(nestedSceneDiv);
+                } else {
+                    // 普通步骤
+                    renderStep(result, container, index);
+                }
+            });
+        }
+
+        function renderStep(step, container, index) {
+            const isSuccess = step.is_success === 1;
+            const stepClass = isSuccess ? 'step-success' : 'step-failure';
+            const badgeClass = isSuccess ? 'success-badge' : 'failure-badge';
+            
+            const stepDiv = document.createElement('div');
+            stepDiv.className = `step-item ${stepClass} mb-2`;
+            stepDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : '失败'}</span>
+                        <span>${step.step_name || step.path || `步骤 ${index + 1}`}</span>
+                    </div>
+                    <i class="bi bi-chevron-down"></i>
+                </div>
+            `;
+            
+            // 步骤详情
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'step-details';
+            detailsDiv.style.display = 'none';
+            
+            // 构建详情内容
+            let detailsContent = '';
+            
+            if (step.path) {
+                detailsContent += `<p><strong>路径:</strong> ${step.path}</p>`;
+            }
+            
+            if (step.method) {
+                detailsContent += `<p><strong>方法:</strong> ${step.method}</p>`;
+            }
+            
+            if (step.step_type) {
+                detailsContent += `<p><strong>类型:</strong> ${step.step_type}</p>`;
+            }
+            
+            if (step.duration !== undefined) {
+                detailsContent += `<p><strong>耗时:</strong> ${step.duration}秒</p>`;
+            }
+            
+            // 显示响应数据
+            if (step.response) {
+                detailsContent += `<p><strong>响应:</strong></p>`;
+                detailsContent += `<pre>${typeof step.response === 'object' ? JSON.stringify(step.response, null, 2) : step.response}</pre>`;
+            }
+            
+            // 显示请求数据
+            if (step.body) {
+                detailsContent += `<p><strong>请求体:</strong></p>`;
+                detailsContent += `<pre>${typeof step.body === 'object' ? JSON.stringify(step.body, null, 2) : step.body}</pre>`;
+            }
+            
+            if (step.query) {
+                detailsContent += `<p><strong>查询参数:</strong></p>`;
+                detailsContent += `<pre>${typeof step.query === 'object' ? JSON.stringify(step.query, null, 2) : step.query}</pre>`;
+            }
+            
+            // 显示错误信息
+            if (step.error_msg) {
+                detailsContent += `<p><strong>错误信息:</strong></p>`;
+                detailsContent += `<pre class="text-danger">${step.error_msg}</pre>`;
+            }
+            
+            detailsDiv.innerHTML = detailsContent;
+            
+            // 添加点击事件
+            stepDiv.addEventListener('click', function() {
+                const isVisible = detailsDiv.style.display === 'block';
+                detailsDiv.style.display = isVisible ? 'none' : 'block';
+                stepDiv.querySelector('i').className = isVisible ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+            });
+            
+            stepDiv.appendChild(detailsDiv);
+            container.appendChild(stepDiv);
+        }
+    </script>
+</body>
+</html>

@@ -140,6 +140,10 @@
 <body>
     <div class="container-fluid mt-4 mb-5">
         <h1 class="text-center mb-4">自动化测试报告</h1>
+        <div id="current-date" class="text-center mb-3" style="display: none;">
+            <span class="badge bg-info">当前显示: <span id="current-date-value">最新数据</span></span>
+            <button id="reset-to-latest" class="btn btn-sm btn-outline-primary ms-2" style="display: none;">返回最新数据</button>
+        </div>
         
         <div id="loading" class="loading">
             <div class="spinner-border text-primary" role="status">
@@ -644,6 +648,9 @@
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('report-content').style.display = 'block';
                     
+                    // 清空场景列表容器
+                    document.getElementById('scenes-container').innerHTML = '';
+                    
                     // 清除旧图表
                     if (statusChart) statusChart.destroy();
                     if (durationChart) durationChart.destroy();
@@ -693,6 +700,9 @@
             // 将按钮添加到页面
             reportHeader.parentNode.style.position = 'relative';
             reportHeader.parentNode.appendChild(refreshButton);
+            
+            // 添加返回最新数据按钮的事件监听
+            document.getElementById('reset-to-latest').addEventListener('click', resetToLatestData);
         });
         
         // 初始化历史趋势图
@@ -793,9 +803,116 @@
                                 stepSize: 1
                             }
                         }
+                    },
+                    // 添加点击事件处理
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            // 如果直接点击到了数据点
+                            const index = elements[0].index;
+                            const selectedData = historyData[index];
+                            if (selectedData && selectedData.filename) {
+                                loadHistoricalData(selectedData.filename);
+                            }
+                        } else {
+                            // 如果没有直接点击到数据点，找到最近的数据点
+                            const canvasPosition = Chart.helpers.getRelativePosition(event, historyChart);
+                            const xAxis = historyChart.scales.x;
+                            const yAxis = historyChart.scales.y;
+                            
+                            // 找到最接近点击位置的x轴索引
+                            let minDistance = Number.MAX_VALUE;
+                            let closestIndex = -1;
+                            
+                            xAxis.ticks.forEach((tick, index) => {
+                                const xPos = xAxis.getPixelForTick(index);
+                                const distance = Math.abs(xPos - canvasPosition.x);
+                                
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestIndex = index;
+                                }
+                            });
+                            
+                            if (closestIndex !== -1 && historyData[closestIndex] && historyData[closestIndex].filename) {
+                                loadHistoricalData(historyData[closestIndex].filename);
+                            }
+                        }
                     }
                 }
             });
+        }
+        
+        // 加载历史数据
+        function loadHistoricalData(filename) {
+            // 显示加载中状态
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('report-content').style.display = 'none';
+            
+            // 请求特定日期的数据
+            fetch(`/api/data/${filename}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('数据加载失败');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('report-content').style.display = 'block';
+                    
+                    // 清空场景列表容器
+                    document.getElementById('scenes-container').innerHTML = '';
+                    
+                    // 清除旧图表
+                    if (statusChart) statusChart.destroy();
+                    if (durationChart) durationChart.destroy();
+                    
+                    // 更新当前显示的日期信息
+                    const dateMatch = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+                    if (dateMatch) {
+                        const [_, year, month, day, hour, minute, second] = dateMatch;
+                        const formattedDate = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+                        document.getElementById('current-date-value').textContent = formattedDate;
+                        document.getElementById('current-date').style.display = 'block';
+                        
+                        // 检查是否为最新数据，只有在非最新数据时才显示返回按钮
+                        fetch('/api/history')
+                            .then(response => response.json())
+                            .then(historyData => {
+                                if (historyData && historyData.length > 0) {
+                                    // 按时间戳排序
+                                    historyData.sort((a, b) => b.timestamp - a.timestamp);
+                                    // 检查当前查看的是否为最新数据
+                                    const isLatest = historyData[0].filename === filename;
+                                    document.getElementById('reset-to-latest').style.display = isLatest ? 'none' : 'inline-block';
+                                }
+                            })
+                            .catch(error => {
+                                console.error('获取历史数据失败:', error);
+                                // 出错时默认显示返回按钮
+                                document.getElementById('reset-to-latest').style.display = 'inline-block';
+                            });
+                    }
+                    
+                    // 重新渲染报告
+                    renderReport(data);
+                })
+                .catch(error => {
+                    document.getElementById('loading').innerHTML = `<div class="alert alert-danger">加载数据失败: ${error}</div>`;
+                    setTimeout(() => {
+                        document.getElementById('loading').innerHTML = `<div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div>`;
+                    }, 3000);
+                });
+        }
+        
+        // 返回最新数据
+        function resetToLatestData() {
+            // 隐藏日期显示
+            document.getElementById('current-date').style.display = 'none';
+            document.getElementById('reset-to-latest').style.display = 'none';
+            
+            // 重新加载最新数据
+            refreshData();
         }
     </script>
 </body>

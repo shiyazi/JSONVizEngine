@@ -129,12 +129,35 @@ def get_history_data():
                         'success': success_count,
                         'failure': failure_count,
                         'skipped': skipped_count,
-                        'total': len(data['scene_result'])
+                        'total': len(data['scene_result']),
+                        'filename': os.path.basename(file_path)  # 添加文件名，用于前端请求特定文件
                     })
             except Exception as e:
                 print(f"Error processing {file_path}: {str(e)}")
         
         return jsonify(history_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/data/<filename>')
+def get_data_by_filename(filename):
+    try:
+        # 验证文件名格式，防止路径遍历攻击
+        if not re.match(r'^\d{8}_\d{6}\.json$', filename):
+            return jsonify({'error': '无效的文件名格式'}), 400
+            
+        # 首先在result目录中查找
+        file_path = os.path.join('result', filename)
+        if not os.path.exists(file_path):
+            # 如果不存在，则在history子目录中查找
+            file_path = os.path.join('result', 'history', filename)
+            if not os.path.exists(file_path):
+                return jsonify({'error': '找不到指定的文件'}), 404
+        
+        # 读取并返回文件内容
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

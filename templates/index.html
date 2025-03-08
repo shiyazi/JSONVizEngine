@@ -3,252 +3,929 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>测试报告</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <title>测试报告可视化</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
-        .success-badge {
-            background-color: #28a745;
-            color: white;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
         }
-        .failure-badge {
-            background-color: #dc3545;
-            color: white;
+        body {
+            background-color: #fff;
+            color: #333;
+            padding: 20px;
         }
-        .scene-card {
-            margin-bottom: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        .container {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 40px);
+            max-width: 100%;
         }
-        .scene-header {
-            cursor: pointer;
-            padding: 10px 15px;
-            border-radius: 5px 5px 0 0;
-        }
-        .success-header {
-            background-color: rgba(40, 167, 69, 0.1);
-            border-left: 5px solid #28a745;
-        }
-        .failure-header {
-            background-color: rgba(220, 53, 69, 0.1);
-            border-left: 5px solid #dc3545;
-        }
-        .scene-body {
+        .left-panel {
+            width: 33.33%;
+            min-width: 33.33%;
+            max-width: 33.33%;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
             padding: 15px;
-            border: 1px solid #eee;
-            border-top: none;
-            border-radius: 0 0 5px 5px;
+            overflow: hidden;
+        }
+        .right-panel {
+            width: 66.67%;
+            min-width: 66.67%;
+            max-width: 66.67%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .stats-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            flex: 1;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .stat-box.total {
+            background-color: #3498db;
+        }
+        .stat-box.success {
+            background-color: #2ecc71;
+        }
+        .stat-box.failed {
+            background-color: #e74c3c;
+        }
+        .stat-box h3 {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .stat-box p {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .cases-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .chart-container {
+            flex: 1;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            position: relative;
+        }
+        .chart-buttons {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .chart-button {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f8f8f8;
+            cursor: pointer;
+        }
+        .chart-button.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .bottom-charts {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+        }
+        .donut-chart-container {
+            flex: 1;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            position: relative;
+        }
+        .bar-chart-container {
+            flex: 2;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .scene-item {
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .scene-name {
+            padding: 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+        }
+        .scene-name.success {
+            background-color: rgba(46, 204, 113, 0.1);
+            border-left: 4px solid #2ecc71;
+        }
+        .scene-name.failed {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid #e74c3c;
+        }
+        .scene-name.skipped {
+            background-color: rgba(241, 196, 15, 0.1);
+            border-left: 4px solid #f1c40f;
+        }
+        .steps-container {
+            margin-left: 20px;
+            display: none;
         }
         .step-item {
-            padding: 8px 15px;
-            margin-bottom: 5px;
-            border-radius: 3px;
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 4px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
         }
-        .step-success {
-            background-color: rgba(40, 167, 69, 0.05);
-            border-left: 3px solid #28a745;
+        .step-item.success {
+            background-color: rgba(46, 204, 113, 0.05);
+            border-left: 2px solid #2ecc71;
         }
-        .step-failure {
-            background-color: rgba(220, 53, 69, 0.05);
-            border-left: 3px solid #dc3545;
+        .step-item.failed {
+            background-color: rgba(231, 76, 60, 0.05);
+            border-left: 2px solid #e74c3c;
+        }
+        .step-item.skipped {
+            background-color: rgba(241, 196, 15, 0.05);
+            border-left: 2px solid #f1c40f;
+        }
+        .step-item.skipped {
+            background-color: rgba(241, 196, 15, 0.05);
+            border-left: 2px solid #f1c40f;
         }
         .step-details {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 3px;
-            font-size: 0.9rem;
-        }
-        pre {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 3px;
+            margin-left: 20px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            margin-top: 5px;
+            display: none;
+            font-size: 12px;
             max-height: 300px;
             overflow-y: auto;
         }
-        .loading {
+        .step-details-content {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100px;
+            gap: 20px;
         }
-        .summary-stats {
-            margin-bottom: 20px;
+        .step-details-request,
+        .step-details-response {
+            flex: 1;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #eee;
         }
-        .stat-card {
-            text-align: center;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: transform 0.2s;
+        .toggle-icon {
+            margin-left: auto;
+            font-size: 12px;
+            display: none; /* 隐藏加号图标 */
         }
-        .stat-card:hover {
-            transform: translateY(-2px);
-        }
-        .chart-container {
-            height: 300px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            border-radius: 5px;
-            padding: 15px;
-            background-color: #fff;
-        }
-        .history-chart-container {
-            height: 350px;
-        }
-        .status-chart-container {
-            height: 250px;
-        }
-        .left-panel {
-            height: calc(100vh - 100px);
-            overflow-y: auto;
-        }
-        .right-panel {
-            height: calc(100vh - 100px);
-            display: flex;
-            flex-direction: column;
-        }
-        .chart-title {
-            font-size: 1.2rem;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-        .skipped-badge {
-            background-color: #ffc107;
+        .duration-badge {
+            margin-left: auto;
+            background-color: #555;
             color: white;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+            min-width: 50px;
+            text-align: center;
+            display: inline-block;
+            font-size: 12px;
         }
-        .step-skipped {
-            background-color: rgba(255, 193, 7, 0.05);
-            border-left: 3px solid #ffc107;
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
         }
-        .tooltip-container {
-            position: absolute;
-            background-color: rgba(0, 0, 0, 0.8);
+        .status-indicator.success {
+            background-color: #2ecc71;
+        }
+        .status-indicator.failed {
+            background-color: #e74c3c;
+        }
+        .status-indicator.skipped {
+            background-color: #f1c40f;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
             color: white;
-            padding: 5px 10px;
-            border-radius: 3px;
-            font-size: 0.8rem;
-            pointer-events: none;
-            z-index: 1000;
-            display: none;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-badge.success {
+            background-color: #2ecc71;
+        }
+        .status-badge.failed {
+            background-color: #e74c3c;
+        }
+        .status-badge.skipped {
+            background-color: #f1c40f;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid mt-4 mb-5">
-        <h1 class="text-center mb-4">自动化测试报告</h1>
-        <div id="current-date" class="text-center mb-3" style="display: none;">
-            <span class="badge bg-info">当前显示: <span id="current-date-value">最新数据</span></span>
-            <button id="reset-to-latest" class="btn btn-sm btn-outline-primary ms-2" style="display: none;">返回最新数据</button>
-        </div>
-        
-        <div id="loading" class="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">加载中...</span>
+    <div class="container">
+        <div class="left-panel">
+            <div class="stats-container">
+                <div class="stat-box total">
+                    <h3>总用例数</h3>
+                    <p id="total-count">0</p>
+                </div>
+                <div class="stat-box success">
+                    <h3>成功用例数</h3>
+                    <p id="success-count">0</p>
+                </div>
+                <div class="stat-box failed">
+                    <h3>失败用例数</h3>
+                    <p id="failed-count">0</p>
+                </div>
+            </div>
+            <div class="cases-container" id="cases-container">
+                <!-- 测试用例层级列表将在这里动态生成 -->
             </div>
         </div>
-
-        <div id="report-content" style="display: none;">
-            <div class="row">
-                <!-- 左侧面板：统计信息和场景列表 -->
-                <div class="col-md-5 left-panel">
-                    <div class="row summary-stats mb-4">
-                        <div class="col-md-4">
-                            <div class="stat-card bg-light" onclick="filterScenesByStatus('all')">
-                                <h3 id="total-scenes">0</h3>
-                                <p class="mb-0">总场景数</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="stat-card bg-success bg-opacity-10" onclick="filterScenesByStatus(1)">
-                                <h3 id="success-scenes">0</h3>
-                                <p class="mb-0">成功场景数</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="stat-card bg-danger bg-opacity-10" onclick="filterScenesByStatus(0)">
-                                <h3 id="failed-scenes">0</h3>
-                                <p class="mb-0">失败场景数</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="scenes-container"></div>
+        <div class="right-panel">
+            <div class="chart-container">
+                <div class="chart-buttons">
+                    <button class="chart-button active" id="pass-rate-btn">通过率</button>
+                    <button class="chart-button" id="case-count-btn">用例数量</button>
+                    <button class="chart-button" id="current-data-btn" style="display: none; background-color: #e67e22; color: white; border-color: #e67e22;">返回当前数据</button>
                 </div>
-                
-                <!-- 右侧面板：图表 -->
-                <div class="col-md-7 right-panel">
-                    <!-- 右上：历史趋势图 -->
-                    <div class="chart-container history-chart-container">
-                        <div class="chart-title">历史趋势图</div>
-                        <canvas id="history-chart"></canvas>
-                        <div id="history-tooltip" class="tooltip-container"></div>
-                    </div>
-                    
-                    <!-- 右中：环形图 -->
-                    <div class="chart-container status-chart-container">
-                        <div class="chart-title">场景状态分布</div>
-                        <canvas id="status-chart"></canvas>
-                        <div id="chart-tooltip" class="tooltip-container"></div>
-                    </div>
-                    
-                    <!-- 右下方：场景耗时条形图 -->
-                    <div class="chart-container">
-                        <div class="chart-title">场景耗时分布</div>
-                        <canvas id="duration-chart"></canvas>
-                        <div id="duration-tooltip" class="tooltip-container"></div>
-                    </div>
+                <canvas id="line-chart"></canvas>
+            </div>
+            <div class="bottom-charts">
+                <div class="donut-chart-container">
+                    <canvas id="donut-chart"></canvas>
+                </div>
+                <div class="bar-chart-container">
+                    <canvas id="bar-chart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.min.js"></script>
     <script>
-        // 全局变量，用于存储场景数据和图表实例
-        let allScenes = [];
-        let statusChart = null;
-        let durationChart = null;
-        let historyChart = null;
+        // 全局变量，用于存储当前数据和历史数据
+        let currentData = null;
+        let currentHistoryData = null;
+        let currentChartType = 'pass-rate';
+        let isViewingHistory = false;
 
-        // 初始化环形图
-        function initStatusChart(sceneResults) {
-            const successCount = sceneResults.filter(scene => scene.is_success === 1).length;
-            const failureCount = sceneResults.filter(scene => scene.is_success === 0).length;
-            const skippedCount = sceneResults.filter(scene => scene.is_success === 2).length;
-            const total = sceneResults.length;
-            const successRate = total > 0 ? Math.round((successCount / total) * 100) : 0;
+        // 初始化Socket.IO连接
+        const socket = io();
 
-            const ctx = document.getElementById('status-chart').getContext('2d');
-            statusChart = new Chart(ctx, {
+        // 监听文件变化事件
+        socket.on('files_changed', function(data) {
+            console.log('检测到文件变化:', data);
+
+            // 如果用户正在查看历史数据，不自动刷新
+            if (isViewingHistory) {
+                return;
+            }
+
+            // 根据变化类型刷新数据
+            if (data.type === 'result') {
+                console.log('刷新当前结果数据');
+                refreshCurrentData();
+            } else if (data.type === 'history') {
+                console.log('刷新历史数据');
+                refreshHistoryData();
+            }
+        });
+
+        // 刷新当前结果数据
+        function refreshCurrentData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    // 更新全局数据
+                    currentData = data;
+
+                    // 更新统计数据
+                    updateStats(data.current);
+
+                    // 渲染测试用例层级列表
+                    renderCasesList(data.current.scenes);
+
+                    // 渲染环形图和柱状图
+                    renderDonutChart(data.current);
+                    renderBarChart(data.current.step_failures);
+
+                    console.log('当前数据已刷新');
+                })
+                .catch(error => {
+                    console.error('刷新当前数据出错:', error);
+                });
+        }
+
+        // 刷新历史数据
+        function refreshHistoryData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    // 更新全局历史数据
+                    currentHistoryData = data.history;
+
+                    // 重新渲染折线图
+                    renderLineChart(data.history, currentChartType);
+
+                    console.log('历史数据已刷新');
+                })
+                .catch(error => {
+                    console.error('刷新历史数据出错:', error);
+                });
+        }
+
+        // 获取数据
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                // 保存当前数据
+                currentData = data;
+                currentHistoryData = data.history;
+
+                // 更新统计数据
+                updateStats(data.current);
+
+                // 渲染测试用例层级列表
+                renderCasesList(data.current.scenes);
+
+                // 渲染图表
+                renderLineChart(data.history, 'pass-rate');
+                renderDonutChart(data.current);
+                renderBarChart(data.current.step_failures);
+
+                // 定义全局筛选函数和状态
+                let currentFilter = null;
+                let currentStepFilter = null;
+                // 将筛选函数定义为全局函数，以便在环形图点击事件中使用
+                window.filterCases = (status) => {
+                    // 清除步骤筛选状态
+                    currentStepFilter = null;
+
+                    // 清除失败步骤筛选提示
+                    const existingFilter = document.getElementById('filter-notice');
+                    if (existingFilter) {
+                        const casesContainer = document.getElementById('cases-container');
+                        casesContainer.removeChild(existingFilter);
+                    }
+
+                    const scenes = document.querySelectorAll('.scene-item');
+                    scenes.forEach(scene => {
+                        const sceneStatus = scene.querySelector('.scene-name').classList.contains('success') ? 1 :
+                                      scene.querySelector('.scene-name').classList.contains('skipped') ? 2 : 0;
+                        scene.style.display = status === null || sceneStatus === status ? 'block' : 'none';
+                    });
+                };
+
+                document.querySelector('.stat-box.total').addEventListener('click', () => {
+                    window.currentFilter = null;
+                    window.filterCases(null);
+                    document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '1');
+
+                    // 清除失败步骤筛选提示
+                    const existingFilter = document.getElementById('filter-notice');
+                    if (existingFilter) {
+                        const casesContainer = document.getElementById('cases-container');
+                        casesContainer.removeChild(existingFilter);
+                    }
+
+                    // 重置步骤筛选状态
+                    currentStepFilter = null;
+                });
+
+                document.querySelector('.stat-box.success').addEventListener('click', () => {
+                    window.currentFilter = 1;
+                    window.filterCases(1);
+                    document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
+                    document.querySelector('.stat-box.success').style.opacity = '1';
+
+                    // 清除失败步骤筛选提示
+                    const existingFilter = document.getElementById('filter-notice');
+                    if (existingFilter) {
+                        const casesContainer = document.getElementById('cases-container');
+                        casesContainer.removeChild(existingFilter);
+                    }
+
+                    // 重置步骤筛选状态
+                    currentStepFilter = null;
+                });
+
+                document.querySelector('.stat-box.failed').addEventListener('click', () => {
+                    window.currentFilter = 0;
+                    window.filterCases(0);
+                    document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
+                    document.querySelector('.stat-box.failed').style.opacity = '1';
+
+                    // 清除失败步骤筛选提示
+                    const existingFilter = document.getElementById('filter-notice');
+                    if (existingFilter) {
+                        const casesContainer = document.getElementById('cases-container');
+                        casesContainer.removeChild(existingFilter);
+                    }
+
+                    // 重置步骤筛选状态
+                    currentStepFilter = null;
+                });
+
+                // 添加图表切换按钮事件
+                document.getElementById('pass-rate-btn').addEventListener('click', function() {
+                    document.getElementById('pass-rate-btn').classList.add('active');
+                    document.getElementById('case-count-btn').classList.remove('active');
+                    renderLineChart(currentHistoryData, 'pass-rate');
+                });
+
+                document.getElementById('case-count-btn').addEventListener('click', function() {
+                    document.getElementById('case-count-btn').classList.add('active');
+                    document.getElementById('pass-rate-btn').classList.remove('active');
+                    renderLineChart(currentHistoryData, 'case-count');
+                });
+
+                // 添加返回当前数据按钮事件
+                document.getElementById('current-data-btn').addEventListener('click', function() {
+                    loadCurrentData();
+                });
+            });
+
+        // 加载历史数据
+        function loadHistoryData(date) {
+            // 显示加载中状态
+            document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px;">加载中...</div>';
+
+            // 显示返回当前数据按钮
+            document.getElementById('current-data-btn').style.display = 'block';
+
+            // 设置查看历史数据状态
+            isViewingHistory = true;
+
+            // 获取历史数据
+            fetch(`/api/history/${encodeURIComponent(date)}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新统计数据
+                    updateStats(data);
+
+                    // 渲染测试用例层级列表
+                    renderCasesList(data.scenes);
+
+                    // 渲染环形图和柱状图
+                    renderDonutChart(data);
+                    renderBarChart(data.step_failures);
+
+                    // 添加历史数据标记
+                    const title = document.createElement('div');
+                    title.style.textAlign = 'center';
+                    title.style.padding = '10px';
+                    title.style.backgroundColor = '#f39c12';
+                    title.style.color = 'white';
+                    title.style.borderRadius = '4px';
+                    title.style.marginBottom = '10px';
+                    title.style.fontWeight = 'bold';
+                    title.innerHTML = `查看历史数据: ${date}`;
+                    document.getElementById('cases-container').insertBefore(title, document.getElementById('cases-container').firstChild);
+                })
+                .catch(error => {
+                    console.error('Error loading history data:', error);
+                    document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px; color: red;">加载历史数据失败</div>';
+                });
+        }
+
+        // 加载当前数据
+        function loadCurrentData() {
+            if (!isViewingHistory) return;
+
+            // 隐藏返回当前数据按钮
+            document.getElementById('current-data-btn').style.display = 'none';
+
+            // 重置查看历史数据状态
+            isViewingHistory = false;
+
+            // 更新统计数据
+            updateStats(currentData.current);
+
+            // 渲染测试用例层级列表
+            renderCasesList(currentData.current.scenes);
+
+            // 渲染环形图和柱状图
+            renderDonutChart(currentData.current);
+            renderBarChart(currentData.current.step_failures);
+        }
+
+        // 更新统计数据
+        function updateStats(data) {
+            document.getElementById('total-count').textContent = data.total;
+            document.getElementById('success-count').textContent = data.success;
+            document.getElementById('failed-count').textContent = data.failed;
+        }
+
+        // 渲染测试用例层级列表
+        function renderCasesList(scenes) {
+            const container = document.getElementById('cases-container');
+            container.innerHTML = '';
+
+            scenes.forEach((scene, index) => {
+                const sceneItem = document.createElement('div');
+                sceneItem.className = 'scene-item';
+
+                const sceneName = document.createElement('div');
+                const statusClass = scene.is_success === 1 ? 'success' : (scene.is_success === 2 ? 'skipped' : 'failed');
+                sceneName.className = `scene-name ${statusClass}`;
+
+                const statusBadge = document.createElement('span');
+                statusBadge.className = `status-badge ${statusClass}`;
+                statusBadge.textContent = scene.is_success === 1 ? '成功' : (scene.is_success === 2 ? '跳过' : '失败');
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = scene.scene_name || `场景 ${index + 1}`;
+
+                const toggleIcon = document.createElement('span');
+                toggleIcon.className = 'toggle-icon';
+                toggleIcon.textContent = '+';
+
+                const sceneDurationSpan = document.createElement('span');
+                sceneDurationSpan.className = 'duration-badge';
+                // 计算场景总运行时间
+                let totalDuration = 0;
+                if (scene.scene_result && Array.isArray(scene.scene_result)) {
+                    scene.scene_result.forEach(step => {
+                        totalDuration += (step.duration || 0);
+                    });
+                }
+                sceneDurationSpan.textContent = `${totalDuration}s`;
+
+                sceneName.appendChild(statusBadge);
+                sceneName.appendChild(nameSpan);
+                sceneName.appendChild(toggleIcon);
+                sceneName.appendChild(sceneDurationSpan);
+
+                const stepsContainer = document.createElement('div');
+                stepsContainer.className = 'steps-container';
+
+                if (scene.scene_result && Array.isArray(scene.scene_result)) {
+                    scene.scene_result.forEach((step, stepIndex) => {
+                        const stepItem = document.createElement('div');
+                        const stepStatusClass = step.is_success === 1 ? 'success' : (step.is_success === 2 ? 'skipped' : 'failed');
+                        stepItem.className = `step-item ${stepStatusClass}`;
+
+                        const stepStatusBadge = document.createElement('span');
+                        stepStatusBadge.className = `status-badge ${stepStatusClass}`;
+                        stepStatusBadge.textContent = step.is_success === 1 ? '成功' : (step.is_success === 2 ? '跳过' : '失败');
+
+                        const stepNameSpan = document.createElement('span');
+                        stepNameSpan.textContent = step.step_name || `步骤 ${stepIndex + 1}`;
+
+                        const stepToggleIcon = document.createElement('span');
+                        stepToggleIcon.className = 'toggle-icon';
+                        stepToggleIcon.textContent = '+';
+
+                        const stepDurationSpan = document.createElement('span');
+                        stepDurationSpan.className = 'duration-badge';
+                        stepDurationSpan.textContent = `${step.duration || 0}s`;
+
+                        stepItem.appendChild(stepStatusBadge);
+                        stepItem.appendChild(stepNameSpan);
+                        stepItem.appendChild(stepToggleIcon);
+                        stepItem.appendChild(stepDurationSpan);
+
+                        const stepDetails = document.createElement('div');
+                        stepDetails.className = 'step-details';
+                        stepDetails.innerHTML = `
+                            <div class="step-details-content">
+                                <div class="step-details-request">
+                                    <h4>请求信息</h4>
+                                    <p><strong>路径:</strong> ${step.path || 'N/A'}</p>
+                                    <p><strong>方法:</strong> ${step.method || 'N/A'}</p>
+                                    <p><strong>类型:</strong> ${step.step_type || 'N/A'}</p>
+                                    ${step.query ? `<p><strong>查询参数:</strong> <pre>${JSON.stringify(step.query, null, 2)}</pre></p>` : ''}
+                                    ${step.body ? `<p><strong>请求体:</strong> <pre>${JSON.stringify(step.body, null, 2)}</pre></p>` : ''}
+                                </div>
+                                <div class="step-details-response">
+                                    <h4>响应信息</h4>
+                                    ${step.error_msg ? `<p><strong>错误:</strong> ${step.error_msg}</p>` : ''}
+                                    ${step.response ? `<p><strong>响应:</strong> <pre>${JSON.stringify(step.response, null, 2)}</pre></p>` : ''}
+                                </div>
+                            </div>
+                        `;
+
+                        stepItem.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            if (stepDetails.style.display === 'block') {
+                                stepDetails.style.display = 'none';
+                                stepToggleIcon.textContent = '+';
+                            } else {
+                                stepDetails.style.display = 'block';
+                                stepToggleIcon.textContent = '-';
+                            }
+                        });
+
+                        stepsContainer.appendChild(stepItem);
+                        stepsContainer.appendChild(stepDetails);
+                    });
+                }
+
+                sceneName.addEventListener('click', function() {
+                    if (stepsContainer.style.display === 'block') {
+                        stepsContainer.style.display = 'none';
+                        toggleIcon.textContent = '+';
+                    } else {
+                        stepsContainer.style.display = 'block';
+                        toggleIcon.textContent = '-';
+                    }
+                });
+
+                sceneItem.appendChild(sceneName);
+                sceneItem.appendChild(stepsContainer);
+                container.appendChild(sceneItem);
+            });
+        }
+
+        // 渲染折线图
+        function renderLineChart(historyData, type) {
+            const ctx = document.getElementById('line-chart').getContext('2d');
+
+            // 销毁现有图表（如果存在）
+            if (window.lineChart) {
+                window.lineChart.destroy();
+            }
+
+            const dates = historyData.map(item => item.date);
+
+            if (type === 'pass-rate') {
+                const passRates = historyData.map(item => item.pass_rate);
+
+                window.lineChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: '通过率 (%)',
+                            data: passRates.map(rate => parseFloat(rate.toFixed(2))),
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '通过率趋势'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `通过率: ${context.raw.toFixed(2)}%`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(2) + '%';
+                                    }
+                                }
+                            }
+                        },
+                        onClick: (event, elements, chart) => {
+                            // 获取点击位置的X坐标
+                            const canvasPosition = Chart.helpers.getRelativePosition(event, chart.chart);
+                            const xIndex = Math.round(chart.scales.x.getValueForPixel(canvasPosition.x));
+
+                            // 确保索引在有效范围内
+                            if (xIndex >= 0 && xIndex < dates.length) {
+                                const date = dates[xIndex];
+                                // 检查是否点击的是最新数据点
+                                if (xIndex === dates.length - 1) {
+                                    // 如果是最新数据点，则返回当前数据视图
+                                    loadCurrentData();
+                                } else {
+                                    // 否则加载历史数据
+                                    loadHistoryData(date);
+                                }
+                            }
+                        }
+                    }
+                });
+            } else if (type === 'case-count') {
+                const successCounts = historyData.map(item => item.success);
+                const failedCounts = historyData.map(item => item.failed);
+                const skippedCounts = historyData.map(item => item.skipped);
+
+                window.lineChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [
+                            {
+                                label: '成功用例',
+                                data: successCounts,
+                                borderColor: '#2ecc71',
+                                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: '失败用例',
+                                data: failedCounts,
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: '跳过用例',
+                                data: skippedCounts,
+                                borderColor: '#f1c40f',
+                                backgroundColor: 'rgba(241, 196, 15, 0.1)',
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '用例数量趋势'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        onClick: (event, elements, chart) => {
+                            // 获取点击位置的X坐标
+                            const canvasPosition = Chart.helpers.getRelativePosition(event, chart.chart);
+                            const xIndex = Math.round(chart.scales.x.getValueForPixel(canvasPosition.x));
+
+                            // 确保索引在有效范围内
+                            if (xIndex >= 0 && xIndex < dates.length) {
+                                const date = dates[xIndex];
+                                // 检查是否点击的是最新数据点
+                                if (xIndex === dates.length - 1) {
+                                    // 如果是最新数据点，则返回当前数据视图
+                                    loadCurrentData();
+                                } else {
+                                    // 否则加载历史数据
+                                    loadHistoryData(date);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 加载历史数据
+        function loadHistoryData(date) {
+            // 显示加载中状态
+            document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px;">加载中...</div>';
+
+            // 显示返回当前数据按钮
+            document.getElementById('current-data-btn').style.display = 'block';
+
+            // 设置查看历史数据状态
+            isViewingHistory = true;
+
+            // 获取历史数据
+            fetch(`/api/history/${encodeURIComponent(date)}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新统计数据
+                    updateStats(data);
+
+                    // 渲染测试用例层级列表
+                    renderCasesList(data.scenes);
+
+                    // 渲染环形图和柱状图
+                    renderDonutChart(data);
+                    renderBarChart(data.step_failures);
+
+                    // 添加历史数据标记
+                    const title = document.createElement('div');
+                    title.style.textAlign = 'center';
+                    title.style.padding = '10px';
+                    title.style.backgroundColor = '#f39c12';
+                    title.style.color = 'white';
+                    title.style.borderRadius = '4px';
+                    title.style.marginBottom = '10px';
+                    title.style.fontWeight = 'bold';
+                    title.innerHTML = `查看历史数据: ${date}`;
+                    document.getElementById('cases-container').insertBefore(title, document.getElementById('cases-container').firstChild);
+                })
+                .catch(error => {
+                    console.error('Error loading history data:', error);
+                    document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px; color: red;">加载历史数据失败</div>';
+                });
+        }
+
+        // 加载当前数据
+        function loadCurrentData() {
+            if (!isViewingHistory) return;
+
+            // 隐藏返回当前数据按钮
+            document.getElementById('current-data-btn').style.display = 'none';
+
+            // 重置查看历史数据状态
+            isViewingHistory = false;
+
+            // 更新统计数据
+            updateStats(currentData.current);
+
+            // 渲染测试用例层级列表
+            renderCasesList(currentData.current.scenes);
+
+            // 渲染环形图和柱状图
+            renderDonutChart(currentData.current);
+            renderBarChart(currentData.current.step_failures);
+        }
+
+        // 更新统计数据
+        function updateStats(data) {
+            document.getElementById('total-count').textContent = data.total;
+            document.getElementById('success-count').textContent = data.success;
+            document.getElementById('failed-count').textContent = data.failed;
+        }
+
+
+        // 渲染环形图
+        function renderDonutChart(data) {
+            const ctx = document.getElementById('donut-chart').getContext('2d');
+
+            // 销毁现有图表（如果存在）
+            if (window.donutChart) {
+                window.donutChart.destroy();
+            }
+
+            // 计算成功率
+            const passRate = (data.success / (data.success + data.failed + data.skipped) * 100).toFixed(1);
+
+            window.donutChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: ['成功', '失败', '跳过'],
                     datasets: [{
-                        data: [successCount, failureCount, skippedCount],
-                        backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
-                        borderWidth: 0
+                        data: [data.success, data.failed, data.skipped],
+                        backgroundColor: ['#2ecc71', '#e74c3c', '#f1c40f']
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
                     plugins: {
+                        title: {
+                            display: true,
+                            text: '用例执行结果分布'
+                        },
                         legend: {
                             position: 'bottom'
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.raw;
                                     const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = Math.round((value / total) * 100);
-                                    return `${label}: ${value} (${percentage}%)`;
+                                    const percentage = Math.round((context.raw / total) * 100);
+                                    const labels = ['成功率：', '失败率：', '跳过率：'];
+                                    return labels[context.dataIndex] + percentage + '%';
                                 }
                             }
                         }
@@ -257,187 +934,81 @@
                         if (elements.length > 0) {
                             const index = elements[0].index;
                             const status = index === 0 ? 1 : (index === 1 ? 0 : 2);
-                            filterScenesByStatus(status);
+                            window.currentFilter = status;
+                            window.filterCases(status);
+
+                            // 清除失败步骤筛选提示
+                            const existingFilter = document.getElementById('filter-notice');
+                            if (existingFilter) {
+                                const casesContainer = document.getElementById('cases-container');
+                                casesContainer.removeChild(existingFilter);
+                            }
+
+                            document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
+                            const boxClass = status === 1 ? 'success' : (status === 0 ? 'failed' : 'skipped');
+                            document.querySelector(`.stat-box.${boxClass}`).style.opacity = '1';
+                        } else {
+                            window.currentFilter = null;
+                            window.filterCases(null);
+
+                            // 清除失败步骤筛选提示
+                            const existingFilter = document.getElementById('filter-notice');
+                            if (existingFilter) {
+                                const casesContainer = document.getElementById('cases-container');
+                                casesContainer.removeChild(existingFilter);
+                            }
+
+                            document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '1');
                         }
                     }
                 },
                 plugins: [{
                     id: 'centerText',
-                    beforeDraw: function(chart) {
+                    afterDraw: function(chart) {
                         const width = chart.width;
                         const height = chart.height;
                         const ctx = chart.ctx;
-                        
+
                         ctx.restore();
-                        ctx.font = 'bold 24px Arial';
+                        ctx.font = 'bold 18px Arial';  // 将字体大小从24px改为18px
                         ctx.textBaseline = 'middle';
                         ctx.textAlign = 'center';
-                        
-                        const text = `${successRate}%`;
-                        const textX = width / 2;
-                        const textY = height / 2;
-                        
+
+                        // 绘制成功率数值
                         ctx.fillStyle = '#333';
-                        ctx.fillText(text, textX, textY);
-                        
-                        ctx.font = '14px Arial';
-                        ctx.fillText('成功率', textX, textY + 25);
-                        ctx.save();
-                    }
-                }],
-                plugins: [{
-                    id: 'centerText',
-                    beforeDraw: function(chart) {
-                        const width = chart.width;
-                        const height = chart.height;
-                        const ctx = chart.ctx;
-                        
-                        ctx.restore();
-                        ctx.font = 'bold 24px Arial';
-                        ctx.textBaseline = 'middle';
-                        ctx.textAlign = 'center';
-                        
-                        const text = `${successRate}%`;
-                        const textX = width / 2;
-                        const textY = height / 2;
-                        
-                        ctx.fillStyle = '#333';
-                        ctx.fillText(text, textX, textY);
-                        
-                        ctx.font = '14px Arial';
-                        ctx.fillText('成功率', textX, textY + 25);
+                        ctx.fillText(passRate + '%', width / 2, height / 2);
+
                         ctx.save();
                     }
                 }]
             });
         }
 
-        // 初始化条形图
-        function initDurationChart(sceneResults) {
-            // 计算场景耗时分布
-            const durations = sceneResults.map(scene => {
-                let totalDuration = 0;
-                if (Array.isArray(scene.scene_result)) {
-                    totalDuration = scene.scene_result.reduce((sum, step) => sum + (step.duration || 0), 0);
-                }
-                return totalDuration;
-            });
-        
-            // 创建耗时区间
-            const intervals = [0, 1, 2, 5, 10, 20, 50];
-            const counts = new Array(intervals.length).fill(0);
-            const scenesInInterval = new Array(intervals.length).fill().map(() => []);
-        
-            durations.forEach((duration, index) => {
-                for (let i = 0; i < intervals.length; i++) {
-                    const nextInterval = intervals[i + 1] || Infinity;
-                    if (duration >= intervals[i] && duration < nextInterval) {
-                        counts[i]++;
-                        scenesInInterval[i].push(sceneResults[index]);
-                        break;
-                    }
-                }
-            });
-        
-            const labels = intervals.map((val, i) => {
-                const nextVal = intervals[i + 1];
-                return nextVal ? `${val}-${nextVal}秒` : `>${val}秒`;
-            });
-        
-            const ctx = document.getElementById('duration-chart').getContext('2d');
-            durationChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: counts,
-                        backgroundColor: '#4a90e2',
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                title: function(context) {
-                                    return context[0].label;
-                                },
-                                label: function(context) {
-                                    return `场景数量: ${context.raw}`;
-                                }
-                            }
-                        }
-                    },
-                    onClick: (event, elements) => {
-                        if (elements.length > 0) {
-                            const index = elements[0].index;
-                            showDetailChart(scenesInInterval[index], labels[index]);
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            },
-                            title: {
-                                display: true,
-                                text: '场景数量'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: '耗时区间'
-                            }
-                        }
-                    }
-                }
-            });
-        }
+        // 渲染条形图
+        function renderBarChart(stepFailures) {
+            const ctx = document.getElementById('bar-chart').getContext('2d');
 
-        // 显示详细场景图表
-        function showDetailChart(scenes, intervalLabel) {
-            // 隐藏原条形图，显示详细图表
-            document.getElementById('detail-chart-container').style.display = 'block';
-            
-            // 准备数据
-            const sceneNames = scenes.map(scene => scene.scene_name || '未命名场景');
-            const durations = scenes.map(scene => {
-                let totalDuration = 0;
-                if (Array.isArray(scene.scene_result)) {
-                    totalDuration = scene.scene_result.reduce((sum, step) => sum + (step.duration || 0), 0);
-                }
-                return totalDuration;
-            });
-            
-            // 创建详细图表
-            const ctx = document.getElementById('detail-chart').getContext('2d');
-            if (window.detailChart) {
-                window.detailChart.destroy();
+            // 销毁现有图表（如果存在）
+            if (window.barChart) {
+                window.barChart.destroy();
             }
-            
-            document.querySelector('#detail-chart-container .chart-title').textContent = `${intervalLabel} 时间区间内的场景详情`;
-            
-            window.detailChart = new Chart(ctx, {
+
+            const steps = stepFailures.map(item => item.step);
+            const failures = stepFailures.map(item => item.failures);
+
+            window.barChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: sceneNames,
+                    labels: steps,
                     datasets: [{
-                        label: '耗时(秒)',
-                        data: durations,
-                        backgroundColor: scenes.map(scene => scene.is_success === 1 ? '#28a745' : (scene.is_success === 2 ? '#ffc107' : '#dc3545')),
-                        borderWidth: 0
+                        label: '失败次数',
+                        data: failures,
+                        backgroundColor: '#e74c3c',
+                        borderColor: '#c0392b',
+                        borderWidth: 1
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
                     indexAxis: 'y',
                     plugins: {
                         legend: {
@@ -446,473 +1017,106 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `耗时: ${context.raw.toFixed(2)}秒`;
+                                    return `失败次数: ${context.raw}`;
                                 }
                             }
                         }
                     },
                     scales: {
-                        x: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '耗时(秒)'
-                            }
-                        },
                         y: {
-                            title: {
-                                display: true,
-                                text: '场景名称'
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // 隐藏详细图表
-        function hideDetailChart() {
-            document.getElementById('detail-chart-container').style.display = 'none';
-        }
-
-        // 根据状态筛选场景
-        function filterScenesByStatus(status) {
-            const filteredScenes = status === 'all' ? allScenes : allScenes.filter(scene => scene.is_success === status);
-            const scenesContainer = document.getElementById('scenes-container');
-            scenesContainer.innerHTML = '';
-            filteredScenes.forEach((scene, index) => renderScene(scene, index, scenesContainer));
-        }
-
-        // 渲染报告
-        function renderReport(data) {
-            const sceneResults = data.scene_result || [];
-            allScenes = sceneResults;
-
-            // 更新统计信息
-            document.getElementById('total-scenes').textContent = sceneResults.length;
-            const successScenes = sceneResults.filter(scene => scene.is_success === 1).length;
-            document.getElementById('success-scenes').textContent = successScenes;
-            document.getElementById('failed-scenes').textContent = sceneResults.length - successScenes;
-
-            // 初始化图表
-            initStatusChart(sceneResults);
-            initDurationChart(sceneResults);
-
-            // 渲染场景列表
-            const scenesContainer = document.getElementById('scenes-container');
-            sceneResults.forEach((scene, index) => renderScene(scene, index, scenesContainer));
-        }
-
-        // 渲染单个场景
-        function renderScene(scene, index, container) {
-            const sceneCard = document.createElement('div');
-            sceneCard.className = 'scene-card';
-            
-            const isSuccess = scene.is_success === 1;
-            const isSkipped = scene.is_success === 2;
-            const headerClass = isSuccess ? 'success-header' : (isSkipped ? 'skipped-header' : 'failure-header');
-            const badgeClass = isSuccess ? 'success-badge' : (isSkipped ? 'skipped-badge' : 'failure-badge');
-            
-            const sceneName = scene.scene_name || `场景 ${index + 1}`;
-            const sceneType = scene.scene_type || '场景';
-            
-            // 计算场景总耗时
-            let totalDuration = 0;
-            if (Array.isArray(scene.scene_result)) {
-                totalDuration = scene.scene_result.reduce((sum, step) => sum + (step.duration || 0), 0);
-            }
-            
-            sceneCard.innerHTML = `
-                <div class="scene-header ${headerClass}" data-bs-toggle="collapse" data-bs-target="#scene-${index}">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="badge ${badgeClass} me-2">${isSuccess ? '成功' : (isSkipped ? '跳过' : '失败')}</span>
-                            <strong>${sceneName}</strong> <small class="text-muted">(${sceneType})</small>
-                        </div>
-                        <div>
-                            <span class="badge bg-secondary">${totalDuration}秒</span>
-                            <i class="bi bi-chevron-down"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapse scene-body" id="scene-${index}">
-                    ${renderSceneDetails(scene, index)}
-                </div>
-            `;
-            
-            container.appendChild(sceneCard);
-        }
-        
-        // 渲染场景详情
-        function renderSceneDetails(scene, sceneIndex) {
-            if (!Array.isArray(scene.scene_result)) {
-                return `<div class="alert alert-info">无详细步骤信息</div>`;
-            }
-            
-            let html = '<div class="steps-container">';
-            
-            scene.scene_result.forEach((step, stepIndex) => {
-                const isStepSuccess = step.is_success === 1;
-                const isStepSkipped = step.is_success === 2;
-                const stepClass = isStepSuccess ? 'step-success' : (isStepSkipped ? 'step-skipped' : 'step-failure');
-                const stepName = step.step_name || `步骤 ${stepIndex + 1}`;
-                const duration = step.duration || 0;
-                
-                html += `
-                    <div class="step-item ${stepClass}" data-bs-toggle="collapse" data-bs-target="#step-${sceneIndex}-${stepIndex}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="bi ${isStepSuccess ? 'bi-check-circle-fill text-success' : (isStepSkipped ? 'bi-exclamation-circle-fill text-warning' : 'bi-x-circle-fill text-danger')}"></i>
-                                <span class="ms-2">${stepName}</span>
-                            </div>
-                            <div>
-                                <span class="badge bg-secondary">${duration}秒</span>
-                                <i class="bi bi-chevron-down ms-2"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="collapse step-details" id="step-${sceneIndex}-${stepIndex}">
-                        ${renderStepDetails(step)}
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            return html;
-        }
-        
-        // 渲染步骤详情
-        function renderStepDetails(step) {
-            let html = '<div class="row">';
-            
-            // 请求信息
-            html += '<div class="col-md-6">';
-            html += '<h6>请求信息</h6>';
-            html += `<p><strong>路径:</strong> ${step.path || 'N/A'}</p>`;
-            html += `<p><strong>方法:</strong> ${step.method || 'N/A'}</p>`;
-            html += `<p><strong>耗时:</strong> ${step.duration || 0}秒</p>`;
-            
-            // 查询参数
-            if (step.query) {
-                html += '<h6>查询参数</h6>';
-                html += `<pre>${JSON.stringify(step.query, null, 2)}</pre>`;
-            }
-            
-            // 表单数据
-            if (step.form_data) {
-                html += '<h6>表单数据</h6>';
-                html += `<pre>${JSON.stringify(step.form_data, null, 2)}</pre>`;
-            }
-            
-            // 请求体
-            if (step.body) {
-                html += '<h6>请求体</h6>';
-                html += `<pre>${JSON.stringify(step.body, null, 2)}</pre>`;
-            }
-            
-            html += '</div>';
-            
-            // 响应信息
-            html += '<div class="col-md-6">';
-            html += '<h6>响应信息</h6>';
-            
-            if (step.error_msg) {
-                html += `<div class="alert alert-danger">${step.error_msg}</div>`;
-            } else if (step.response) {
-                try {
-                    const responseStr = typeof step.response === 'object' ? 
-                        JSON.stringify(step.response, null, 2) : String(step.response);
-                    html += `<pre>${responseStr}</pre>`;
-                } catch (e) {
-                    html += `<pre>${step.response}</pre>`;
-                }
-            } else {
-                html += '<p>无响应数据</p>';
-            }
-            
-            html += '</div>';
-            html += '</div>';
-            
-            return html;
-        }
-        
-        // 添加刷新数据的函数
-        function refreshData() {
-            console.log('正在刷新数据...');
-            document.getElementById('loading').style.display = 'flex';
-            
-            // 获取最新数据
-            fetch('/api/data')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('report-content').style.display = 'block';
-                    
-                    // 清空场景列表容器
-                    document.getElementById('scenes-container').innerHTML = '';
-                    
-                    // 清除旧图表
-                    if (statusChart) statusChart.destroy();
-                    if (durationChart) durationChart.destroy();
-                    
-                    // 重新渲染报告
-                    renderReport(data);
-                })
-                .catch(error => {
-                    document.getElementById('loading').innerHTML = `<div class="alert alert-danger">加载数据失败: ${error}</div>`;
-                });
-                
-            // 获取最新历史数据
-            fetch('/api/history')
-                .then(response => response.json())
-                .then(data => {
-                    if (historyChart) historyChart.destroy();
-                    initHistoryChart(data);
-                })
-                .catch(error => {
-                    console.error('加载历史数据失败:', error);
-                });
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // 初始加载数据
-            refreshData();
-            
-            // 连接WebSocket
-            const socket = io();
-            
-            // 监听文件变动事件
-            socket.on('data_updated', function(data) {
-                console.log('收到文件变动通知:', data);
-                // 自动刷新数据
-                refreshData();
-            });
-            
-            // 添加手动刷新按钮
-            const reportHeader = document.querySelector('h1.text-center');
-            const refreshButton = document.createElement('button');
-            refreshButton.className = 'btn btn-primary position-absolute';
-            refreshButton.style.right = '20px';
-            refreshButton.style.top = '20px';
-            refreshButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新数据';
-            refreshButton.addEventListener('click', refreshData);
-            
-            // 将按钮添加到页面
-            reportHeader.parentNode.style.position = 'relative';
-            reportHeader.parentNode.appendChild(refreshButton);
-            
-            // 添加返回最新数据按钮的事件监听
-            document.getElementById('reset-to-latest').addEventListener('click', resetToLatestData);
-        });
-        
-        // 初始化历史趋势图
-        function initHistoryChart(historyData) {
-            if (!historyData || historyData.length === 0) {
-                return;
-            }
-            
-            // 按时间戳排序
-            historyData.sort((a, b) => a.timestamp - b.timestamp);
-            
-            // 修改日期格式，只显示到分钟，不显示秒
-            const labels = historyData.map(item => {
-                // 如果日期格式是 YYYY-MM-DD HH:MM:SS，则截取掉秒的部分
-                if (item.date && item.date.length === 19) {
-                    return item.date.substring(0, 16); // 只保留到分钟 YYYY-MM-DD HH:MM
-                }
-                return item.date;
-            });
-            const successData = historyData.map(item => item.success);
-            const failureData = historyData.map(item => item.failure);
-            const skippedData = historyData.map(item => item.skipped);
-            
-            const ctx = document.getElementById('history-chart').getContext('2d');
-            historyChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: '成功',
-                            data: successData,
-                            borderColor: '#28a745',
-                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1,
-                            fill: false
-                        },
-                        {
-                            label: '失败',
-                            data: failureData,
-                            borderColor: '#dc3545',
-                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1,
-                            fill: false
-                        },
-                        {
-                            label: '跳过',
-                            data: skippedData,
-                            borderColor: '#ffc107',
-                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1,
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            callbacks: {
-                                title: function(context) {
-                                    return context[0].label;
-                                },
-                                label: function(context) {
-                                    const label = context.dataset.label || '';
-                                    return `${label}: ${context.raw}`;
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    return label.length > 30 ? label.substr(0, 27) + '...' : label;
                                 }
                             }
-                        },
-                        legend: {
-                            position: 'top',
                         }
                     },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: '时间'
-                            },
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '场景数量'
-                            },
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    },
-                    // 添加点击事件处理
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
-                            // 如果直接点击到了数据点
                             const index = elements[0].index;
-                            const selectedData = historyData[index];
-                            if (selectedData && selectedData.filename) {
-                                loadHistoricalData(selectedData.filename);
-                            }
-                        } else {
-                            // 如果没有直接点击到数据点，找到最近的数据点
-                            const canvasPosition = Chart.helpers.getRelativePosition(event, historyChart);
-                            const xAxis = historyChart.scales.x;
-                            const yAxis = historyChart.scales.y;
-                            
-                            // 找到最接近点击位置的x轴索引
-                            let minDistance = Number.MAX_VALUE;
-                            let closestIndex = -1;
-                            
-                            xAxis.ticks.forEach((tick, index) => {
-                                const xPos = xAxis.getPixelForTick(index);
-                                const distance = Math.abs(xPos - canvasPosition.x);
-                                
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    closestIndex = index;
-                                }
-                            });
-                            
-                            if (closestIndex !== -1 && historyData[closestIndex] && historyData[closestIndex].filename) {
-                                loadHistoricalData(historyData[closestIndex].filename);
-                            }
+                            const stepName = steps[index];
+                            filterScenesByStep(stepName);
                         }
                     }
                 }
             });
         }
-        
-        // 加载历史数据
-        function loadHistoricalData(filename) {
-            // 显示加载中状态
-            document.getElementById('loading').style.display = 'flex';
-            document.getElementById('report-content').style.display = 'none';
-            
-            // 请求特定日期的数据
-            fetch(`/api/data/${filename}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('数据加载失败');
+
+        function filterScenesByStep(stepName) {
+            const scenes = document.querySelectorAll('.scene-item');
+            let filteredCount = 0;
+
+            // 更新当前筛选状态
+            currentStepFilter = stepName;
+
+            // 添加筛选提示
+            const casesContainer = document.getElementById('cases-container');
+            const existingFilter = document.getElementById('filter-notice');
+            if (existingFilter) {
+                casesContainer.removeChild(existingFilter);
+            }
+
+            const filterNotice = document.createElement('div');
+            filterNotice.id = 'filter-notice';
+            filterNotice.style.padding = '8px';
+            filterNotice.style.marginBottom = '10px';
+            filterNotice.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+            filterNotice.style.borderRadius = '4px';
+            filterNotice.style.display = 'flex';
+            filterNotice.style.justifyContent = 'space-between';
+            filterNotice.style.alignItems = 'center';
+
+            const filterText = document.createElement('span');
+            filterText.textContent = `当前筛选: 失败步骤 "${stepName}"`;
+            filterNotice.appendChild(filterText);
+
+            const clearButton = document.createElement('button');
+            clearButton.textContent = '清除筛选';
+            clearButton.style.padding = '4px 8px';
+            clearButton.style.backgroundColor = '#e74c3c';
+            clearButton.style.color = 'white';
+            clearButton.style.border = 'none';
+            clearButton.style.borderRadius = '4px';
+            clearButton.style.cursor = 'pointer';
+            clearButton.onclick = () => {
+                scenes.forEach(scene => scene.style.display = 'block');
+                casesContainer.removeChild(filterNotice);
+                currentStepFilter = null;
+            };
+            filterNotice.appendChild(clearButton);
+
+            casesContainer.insertBefore(filterNotice, casesContainer.firstChild);
+
+            // 筛选场景
+            scenes.forEach(scene => {
+                const steps = scene.querySelectorAll('.step-item');
+                let hasFailedStep = false;
+
+                // 移除自动展开功能，只保留筛选功能
+                steps.forEach(step => {
+                    const stepNameElement = step.querySelector('span:nth-child(2)');
+                    if (stepNameElement.textContent === stepName && step.classList.contains('failed')) {
+                        hasFailedStep = true;
+
+                        // 高亮匹配的步骤，但不自动展开
+                        step.style.backgroundColor = 'rgba(231, 76, 60, 0.2)';
+                    } else if (step.style.backgroundColor) {
+                        step.style.backgroundColor = '';
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('report-content').style.display = 'block';
-                    
-                    // 清空场景列表容器
-                    document.getElementById('scenes-container').innerHTML = '';
-                    
-                    // 清除旧图表
-                    if (statusChart) statusChart.destroy();
-                    if (durationChart) durationChart.destroy();
-                    
-                    // 更新当前显示的日期信息
-                    const dateMatch = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-                    if (dateMatch) {
-                        const [_, year, month, day, hour, minute, second] = dateMatch;
-                        const formattedDate = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-                        document.getElementById('current-date-value').textContent = formattedDate;
-                        document.getElementById('current-date').style.display = 'block';
-                        
-                        // 检查是否为最新数据，只有在非最新数据时才显示返回按钮
-                        fetch('/api/history')
-                            .then(response => response.json())
-                            .then(historyData => {
-                                if (historyData && historyData.length > 0) {
-                                    // 按时间戳排序
-                                    historyData.sort((a, b) => b.timestamp - a.timestamp);
-                                    // 检查当前查看的是否为最新数据
-                                    const isLatest = historyData[0].filename === filename;
-                                    document.getElementById('reset-to-latest').style.display = isLatest ? 'none' : 'inline-block';
-                                }
-                            })
-                            .catch(error => {
-                                console.error('获取历史数据失败:', error);
-                                // 出错时默认显示返回按钮
-                                document.getElementById('reset-to-latest').style.display = 'inline-block';
-                            });
-                    }
-                    
-                    // 重新渲染报告
-                    renderReport(data);
-                })
-                .catch(error => {
-                    document.getElementById('loading').innerHTML = `<div class="alert alert-danger">加载数据失败: ${error}</div>`;
-                    setTimeout(() => {
-                        document.getElementById('loading').innerHTML = `<div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div>`;
-                    }, 3000);
                 });
-        }
-        
-        // 返回最新数据
-        function resetToLatestData() {
-            // 隐藏日期显示
-            document.getElementById('current-date').style.display = 'none';
-            document.getElementById('reset-to-latest').style.display = 'none';
-            
-            // 重新加载最新数据
-            refreshData();
+
+                if (hasFailedStep) {
+                    scene.style.display = 'block';
+                    filteredCount++;
+                } else {
+                    scene.style.display = 'none';
+                }
+            });
+
+            // 更新筛选提示中的计数
+            filterText.textContent = `当前筛选: 失败步骤 "${stepName}" (找到 ${filteredCount} 个场景)`;
         }
     </script>
 </body>

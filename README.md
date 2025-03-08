@@ -4,4 +4,9 @@
 2. 显示场景历史趋势
 3. 显示场景环形图
 4. 显示场景时间消耗图
-   
+
+目录结构：
+-result
+    latest_json
+    -history
+        old_json

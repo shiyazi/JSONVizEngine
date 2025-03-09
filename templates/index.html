@@ -251,6 +251,21 @@
         .status-badge.skipped {
             background-color: #f1c40f;
         }
+        .type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .type-badge.scene {
+            background-color: #3498db;
+        }
+        .type-badge.step {
+            background-color: #9b59b6;
+        }
     </style>
 </head>
 <body>
@@ -300,19 +315,19 @@
         let currentHistoryData = null;
         let currentChartType = 'pass-rate';
         let isViewingHistory = false;
-
+        
         // 初始化Socket.IO连接
         const socket = io();
-
+        
         // 监听文件变化事件
         socket.on('files_changed', function(data) {
             console.log('检测到文件变化:', data);
-
+            
             // 如果用户正在查看历史数据，不自动刷新
             if (isViewingHistory) {
                 return;
             }
-
+            
             // 根据变化类型刷新数据
             if (data.type === 'result') {
                 console.log('刷新当前结果数据');
@@ -322,7 +337,7 @@
                 refreshHistoryData();
             }
         });
-
+        
         // 刷新当前结果数据
         function refreshCurrentData() {
             fetch('/api/data')
@@ -330,24 +345,24 @@
                 .then(data => {
                     // 更新全局数据
                     currentData = data;
-
+                    
                     // 更新统计数据
                     updateStats(data.current);
-
+                    
                     // 渲染测试用例层级列表
                     renderCasesList(data.current.scenes);
-
+                    
                     // 渲染环形图和柱状图
                     renderDonutChart(data.current);
                     renderBarChart(data.current.step_failures);
-
+                    
                     console.log('当前数据已刷新');
                 })
                 .catch(error => {
                     console.error('刷新当前数据出错:', error);
                 });
         }
-
+        
         // 刷新历史数据
         function refreshHistoryData() {
             fetch('/api/data')
@@ -355,17 +370,17 @@
                 .then(data => {
                     // 更新全局历史数据
                     currentHistoryData = data.history;
-
+                    
                     // 重新渲染折线图
                     renderLineChart(data.history, currentChartType);
-
+                    
                     console.log('历史数据已刷新');
                 })
                 .catch(error => {
                     console.error('刷新历史数据出错:', error);
                 });
         }
-
+        
         // 获取数据
         fetch('/api/data')
             .then(response => response.json())
@@ -373,13 +388,13 @@
                 // 保存当前数据
                 currentData = data;
                 currentHistoryData = data.history;
-
+                
                 // 更新统计数据
                 updateStats(data.current);
-
+                
                 // 渲染测试用例层级列表
                 renderCasesList(data.current.scenes);
-
+                
                 // 渲染图表
                 renderLineChart(data.history, 'pass-rate');
                 renderDonutChart(data.current);
@@ -392,14 +407,14 @@
                 window.filterCases = (status) => {
                     // 清除步骤筛选状态
                     currentStepFilter = null;
-
+                    
                     // 清除失败步骤筛选提示
                     const existingFilter = document.getElementById('filter-notice');
                     if (existingFilter) {
                         const casesContainer = document.getElementById('cases-container');
                         casesContainer.removeChild(existingFilter);
                     }
-
+                    
                     const scenes = document.querySelectorAll('.scene-item');
                     scenes.forEach(scene => {
                         const sceneStatus = scene.querySelector('.scene-name').classList.contains('success') ? 1 :
@@ -412,14 +427,14 @@
                     window.currentFilter = null;
                     window.filterCases(null);
                     document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '1');
-
+                    
                     // 清除失败步骤筛选提示
                     const existingFilter = document.getElementById('filter-notice');
                     if (existingFilter) {
                         const casesContainer = document.getElementById('cases-container');
                         casesContainer.removeChild(existingFilter);
                     }
-
+                    
                     // 重置步骤筛选状态
                     currentStepFilter = null;
                 });
@@ -429,14 +444,14 @@
                     window.filterCases(1);
                     document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
                     document.querySelector('.stat-box.success').style.opacity = '1';
-
+                    
                     // 清除失败步骤筛选提示
                     const existingFilter = document.getElementById('filter-notice');
                     if (existingFilter) {
                         const casesContainer = document.getElementById('cases-container');
                         casesContainer.removeChild(existingFilter);
                     }
-
+                    
                     // 重置步骤筛选状态
                     currentStepFilter = null;
                 });
@@ -446,62 +461,62 @@
                     window.filterCases(0);
                     document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
                     document.querySelector('.stat-box.failed').style.opacity = '1';
-
+                    
                     // 清除失败步骤筛选提示
                     const existingFilter = document.getElementById('filter-notice');
                     if (existingFilter) {
                         const casesContainer = document.getElementById('cases-container');
                         casesContainer.removeChild(existingFilter);
                     }
-
+                    
                     // 重置步骤筛选状态
                     currentStepFilter = null;
                 });
-
+                
                 // 添加图表切换按钮事件
                 document.getElementById('pass-rate-btn').addEventListener('click', function() {
                     document.getElementById('pass-rate-btn').classList.add('active');
                     document.getElementById('case-count-btn').classList.remove('active');
                     renderLineChart(currentHistoryData, 'pass-rate');
                 });
-
+                
                 document.getElementById('case-count-btn').addEventListener('click', function() {
                     document.getElementById('case-count-btn').classList.add('active');
                     document.getElementById('pass-rate-btn').classList.remove('active');
                     renderLineChart(currentHistoryData, 'case-count');
                 });
-
+                
                 // 添加返回当前数据按钮事件
                 document.getElementById('current-data-btn').addEventListener('click', function() {
                     loadCurrentData();
                 });
             });
-
+        
         // 加载历史数据
         function loadHistoryData(date) {
             // 显示加载中状态
             document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px;">加载中...</div>';
-
+            
             // 显示返回当前数据按钮
             document.getElementById('current-data-btn').style.display = 'block';
-
+            
             // 设置查看历史数据状态
             isViewingHistory = true;
-
+            
             // 获取历史数据
             fetch(`/api/history/${encodeURIComponent(date)}`)
                 .then(response => response.json())
                 .then(data => {
                     // 更新统计数据
                     updateStats(data);
-
+                    
                     // 渲染测试用例层级列表
                     renderCasesList(data.scenes);
-
+                    
                     // 渲染环形图和柱状图
                     renderDonutChart(data);
                     renderBarChart(data.step_failures);
-
+                    
                     // 添加历史数据标记
                     const title = document.createElement('div');
                     title.style.textAlign = 'center';
@@ -519,59 +534,60 @@
                     document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px; color: red;">加载历史数据失败</div>';
                 });
         }
-
+        
         // 加载当前数据
         function loadCurrentData() {
             if (!isViewingHistory) return;
-
+            
             // 隐藏返回当前数据按钮
             document.getElementById('current-data-btn').style.display = 'none';
-
+            
             // 重置查看历史数据状态
             isViewingHistory = false;
-
+            
             // 更新统计数据
             updateStats(currentData.current);
-
+            
             // 渲染测试用例层级列表
             renderCasesList(currentData.current.scenes);
-
+            
             // 渲染环形图和柱状图
             renderDonutChart(currentData.current);
             renderBarChart(currentData.current.step_failures);
         }
-
+        
         // 更新统计数据
         function updateStats(data) {
             document.getElementById('total-count').textContent = data.total;
             document.getElementById('success-count').textContent = data.success;
             document.getElementById('failed-count').textContent = data.failed;
         }
-
+        
         // 渲染测试用例层级列表
         function renderCasesList(scenes) {
             const container = document.getElementById('cases-container');
             container.innerHTML = '';
-
+            
             scenes.forEach((scene, index) => {
                 const sceneItem = document.createElement('div');
                 sceneItem.className = 'scene-item';
-
+                
                 const sceneName = document.createElement('div');
                 const statusClass = scene.is_success === 1 ? 'success' : (scene.is_success === 2 ? 'skipped' : 'failed');
                 sceneName.className = `scene-name ${statusClass}`;
-
+                
                 const statusBadge = document.createElement('span');
                 statusBadge.className = `status-badge ${statusClass}`;
                 statusBadge.textContent = scene.is_success === 1 ? '成功' : (scene.is_success === 2 ? '跳过' : '失败');
-
+                
                 const nameSpan = document.createElement('span');
-                nameSpan.textContent = scene.scene_name || `场景 ${index + 1}`;
-
+                // 使用scene_name或step_name作为场景名称，如果都不存在则使用默认名称
+                nameSpan.textContent = scene.scene_name || scene.step_name || `场景 ${index + 1}`;
+                
                 const toggleIcon = document.createElement('span');
                 toggleIcon.className = 'toggle-icon';
                 toggleIcon.textContent = '+';
-
+                
                 const sceneDurationSpan = document.createElement('span');
                 sceneDurationSpan.className = 'duration-badge';
                 // 计算场景总运行时间
@@ -580,79 +596,25 @@
                     scene.scene_result.forEach(step => {
                         totalDuration += (step.duration || 0);
                     });
+                } else {
+                    // 如果没有子步骤，使用自身的duration
+                    totalDuration = scene.duration || 0;
                 }
                 sceneDurationSpan.textContent = `${totalDuration}s`;
-
+                
                 sceneName.appendChild(statusBadge);
                 sceneName.appendChild(nameSpan);
                 sceneName.appendChild(toggleIcon);
                 sceneName.appendChild(sceneDurationSpan);
-
+                
                 const stepsContainer = document.createElement('div');
                 stepsContainer.className = 'steps-container';
-
+                
+                // 递归处理嵌套场景和步骤
                 if (scene.scene_result && Array.isArray(scene.scene_result)) {
-                    scene.scene_result.forEach((step, stepIndex) => {
-                        const stepItem = document.createElement('div');
-                        const stepStatusClass = step.is_success === 1 ? 'success' : (step.is_success === 2 ? 'skipped' : 'failed');
-                        stepItem.className = `step-item ${stepStatusClass}`;
-
-                        const stepStatusBadge = document.createElement('span');
-                        stepStatusBadge.className = `status-badge ${stepStatusClass}`;
-                        stepStatusBadge.textContent = step.is_success === 1 ? '成功' : (step.is_success === 2 ? '跳过' : '失败');
-
-                        const stepNameSpan = document.createElement('span');
-                        stepNameSpan.textContent = step.step_name || `步骤 ${stepIndex + 1}`;
-
-                        const stepToggleIcon = document.createElement('span');
-                        stepToggleIcon.className = 'toggle-icon';
-                        stepToggleIcon.textContent = '+';
-
-                        const stepDurationSpan = document.createElement('span');
-                        stepDurationSpan.className = 'duration-badge';
-                        stepDurationSpan.textContent = `${step.duration || 0}s`;
-
-                        stepItem.appendChild(stepStatusBadge);
-                        stepItem.appendChild(stepNameSpan);
-                        stepItem.appendChild(stepToggleIcon);
-                        stepItem.appendChild(stepDurationSpan);
-
-                        const stepDetails = document.createElement('div');
-                        stepDetails.className = 'step-details';
-                        stepDetails.innerHTML = `
-                            <div class="step-details-content">
-                                <div class="step-details-request">
-                                    <h4>请求信息</h4>
-                                    <p><strong>路径:</strong> ${step.path || 'N/A'}</p>
-                                    <p><strong>方法:</strong> ${step.method || 'N/A'}</p>
-                                    <p><strong>类型:</strong> ${step.step_type || 'N/A'}</p>
-                                    ${step.query ? `<p><strong>查询参数:</strong> <pre>${JSON.stringify(step.query, null, 2)}</pre></p>` : ''}
-                                    ${step.body ? `<p><strong>请求体:</strong> <pre>${JSON.stringify(step.body, null, 2)}</pre></p>` : ''}
-                                </div>
-                                <div class="step-details-response">
-                                    <h4>响应信息</h4>
-                                    ${step.error_msg ? `<p><strong>错误:</strong> ${step.error_msg}</p>` : ''}
-                                    ${step.response ? `<p><strong>响应:</strong> <pre>${JSON.stringify(step.response, null, 2)}</pre></p>` : ''}
-                                </div>
-                            </div>
-                        `;
-
-                        stepItem.addEventListener('click', function(e) {
-                            e.stopPropagation();
-                            if (stepDetails.style.display === 'block') {
-                                stepDetails.style.display = 'none';
-                                stepToggleIcon.textContent = '+';
-                            } else {
-                                stepDetails.style.display = 'block';
-                                stepToggleIcon.textContent = '-';
-                            }
-                        });
-
-                        stepsContainer.appendChild(stepItem);
-                        stepsContainer.appendChild(stepDetails);
-                    });
+                    renderSteps(scene.scene_result, stepsContainer);
                 }
-
+                
                 sceneName.addEventListener('click', function() {
                     if (stepsContainer.style.display === 'block') {
                         stepsContainer.style.display = 'none';
@@ -662,27 +624,162 @@
                         toggleIcon.textContent = '-';
                     }
                 });
-
+                
                 sceneItem.appendChild(sceneName);
                 sceneItem.appendChild(stepsContainer);
                 container.appendChild(sceneItem);
             });
         }
-
+        
+        // 递归渲染步骤和嵌套场景
+        function renderSteps(steps, container) {
+            steps.forEach((step, stepIndex) => {
+                // 检查是否为嵌套场景（具有scene_name或包含scene_result数组）
+                const isNestedScene = step.scene_name || (step.scene_result && Array.isArray(step.scene_result) && step.scene_result.length > 0);
+                
+                const stepItem = document.createElement('div');
+                const stepStatusClass = step.is_success === 1 ? 'success' : (step.is_success === 2 ? 'skipped' : 'failed');
+                stepItem.className = isNestedScene ? 'scene-item' : `step-item ${stepStatusClass}`;
+                
+                if (isNestedScene) {
+                    // 处理嵌套场景
+                    const nestedSceneName = document.createElement('div');
+                    nestedSceneName.className = `scene-name ${stepStatusClass}`;
+                    
+                    const nestedStatusBadge = document.createElement('span');
+                    nestedStatusBadge.className = `status-badge ${stepStatusClass}`;
+                    nestedStatusBadge.textContent = step.is_success === 1 ? '成功' : (step.is_success === 2 ? '跳过' : '失败');
+                    
+                    const nestedTypeBadge = document.createElement('span');
+                    nestedTypeBadge.className = 'type-badge scene';
+                    nestedTypeBadge.textContent = '场景';
+                    
+                    const nestedNameSpan = document.createElement('span');
+                    nestedNameSpan.textContent = step.scene_name || step.step_name || `嵌套场景 ${stepIndex + 1}`;
+                    
+                    const nestedToggleIcon = document.createElement('span');
+                    nestedToggleIcon.className = 'toggle-icon';
+                    nestedToggleIcon.textContent = '+';
+                    
+                    const nestedDurationSpan = document.createElement('span');
+                    nestedDurationSpan.className = 'duration-badge';
+                    let nestedTotalDuration = 0;
+                    if (step.scene_result && Array.isArray(step.scene_result)) {
+                        step.scene_result.forEach(subStep => {
+                            nestedTotalDuration += (subStep.duration || 0);
+                        });
+                    } else {
+                        nestedTotalDuration = step.duration || 0;
+                    }
+                    nestedDurationSpan.textContent = `${nestedTotalDuration}s`;
+                    
+                    nestedSceneName.appendChild(nestedStatusBadge);
+                    nestedSceneName.appendChild(nestedTypeBadge);
+                    nestedSceneName.appendChild(nestedNameSpan);
+                    nestedSceneName.appendChild(nestedToggleIcon);
+                    nestedSceneName.appendChild(nestedDurationSpan);
+                    
+                    const nestedStepsContainer = document.createElement('div');
+                    nestedStepsContainer.className = 'steps-container';
+                    
+                    if (step.scene_result && Array.isArray(step.scene_result)) {
+                        renderSteps(step.scene_result, nestedStepsContainer);
+                    }
+                    
+                    nestedSceneName.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        if (nestedStepsContainer.style.display === 'block') {
+                            nestedStepsContainer.style.display = 'none';
+                            nestedToggleIcon.textContent = '+';
+                        } else {
+                            nestedStepsContainer.style.display = 'block';
+                            nestedToggleIcon.textContent = '-';
+                        }
+                    });
+                    
+                    stepItem.appendChild(nestedSceneName);
+                    stepItem.appendChild(nestedStepsContainer);
+                } else {
+                    // 处理普通步骤
+                    const stepStatusBadge = document.createElement('span');
+                    stepStatusBadge.className = `status-badge ${stepStatusClass}`;
+                    stepStatusBadge.textContent = step.is_success === 1 ? '成功' : (step.is_success === 2 ? '跳过' : '失败');
+                    
+                    const stepTypeBadge = document.createElement('span');
+                    stepTypeBadge.className = 'type-badge step';
+                    stepTypeBadge.textContent = '步骤';
+                    
+                    const stepNameSpan = document.createElement('span');
+                    stepNameSpan.textContent = step.step_name || `步骤 ${stepIndex + 1}`;
+                    
+                    const stepToggleIcon = document.createElement('span');
+                    stepToggleIcon.className = 'toggle-icon';
+                    stepToggleIcon.textContent = '+';
+                    
+                    const stepDurationSpan = document.createElement('span');
+                    stepDurationSpan.className = 'duration-badge';
+                    stepDurationSpan.textContent = `${step.duration || 0}s`;
+            
+                    stepItem.appendChild(stepStatusBadge);
+                    stepItem.appendChild(stepTypeBadge);
+                    stepItem.appendChild(stepNameSpan);
+                    stepItem.appendChild(stepToggleIcon);
+                    stepItem.appendChild(stepDurationSpan);
+                    
+                    const stepDetails = document.createElement('div');
+                    stepDetails.className = 'step-details';
+                    stepDetails.innerHTML = `
+                        <div class="step-details-content">
+                            <div class="step-details-request">
+                                <h4>请求信息</h4>
+                                <p><strong>路径:</strong> ${step.path || 'N/A'}</p>
+                                <p><strong>方法:</strong> ${step.method || 'N/A'}</p>
+                                <p><strong>类型:</strong> ${step.step_type || 'N/A'}</p>
+                                ${step.query ? `<p><strong>查询参数:</strong> <pre>${JSON.stringify(step.query, null, 2)}</pre></p>` : ''}
+                                ${step.body ? `<p><strong>请求体:</strong> <pre>${JSON.stringify(step.body, null, 2)}</pre></p>` : ''}
+                            </div>
+                            <div class="step-details-response">
+                                <h4>响应信息</h4>
+                                ${step.error_msg ? `<p><strong>错误:</strong> ${step.error_msg}</p>` : ''}
+                                ${step.response ? `<p><strong>响应:</strong> <pre>${JSON.stringify(step.response, null, 2)}</pre></p>` : ''}
+                            </div>
+                        </div>
+                    `;
+                    
+                    stepItem.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        if (stepDetails.style.display === 'block') {
+                            stepDetails.style.display = 'none';
+                            stepToggleIcon.textContent = '+';
+                        } else {
+                            stepDetails.style.display = 'block';
+                            stepToggleIcon.textContent = '-';
+                        }
+                    });
+                    
+                    container.appendChild(stepItem);
+                    container.appendChild(stepDetails);
+                    return;
+                }
+                
+                container.appendChild(stepItem);
+            });
+        }
+        
         // 渲染折线图
         function renderLineChart(historyData, type) {
             const ctx = document.getElementById('line-chart').getContext('2d');
-
+            
             // 销毁现有图表（如果存在）
             if (window.lineChart) {
                 window.lineChart.destroy();
             }
-
+            
             const dates = historyData.map(item => item.date);
-
+            
             if (type === 'pass-rate') {
                 const passRates = historyData.map(item => item.pass_rate);
-
+                
                 window.lineChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -727,7 +824,7 @@
                             // 获取点击位置的X坐标
                             const canvasPosition = Chart.helpers.getRelativePosition(event, chart.chart);
                             const xIndex = Math.round(chart.scales.x.getValueForPixel(canvasPosition.x));
-
+                            
                             // 确保索引在有效范围内
                             if (xIndex >= 0 && xIndex < dates.length) {
                                 const date = dates[xIndex];
@@ -747,7 +844,7 @@
                 const successCounts = historyData.map(item => item.success);
                 const failedCounts = historyData.map(item => item.failed);
                 const skippedCounts = historyData.map(item => item.skipped);
-
+                
                 window.lineChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -797,7 +894,7 @@
                             // 获取点击位置的X坐标
                             const canvasPosition = Chart.helpers.getRelativePosition(event, chart.chart);
                             const xIndex = Math.round(chart.scales.x.getValueForPixel(canvasPosition.x));
-
+                            
                             // 确保索引在有效范围内
                             if (xIndex >= 0 && xIndex < dates.length) {
                                 const date = dates[xIndex];
@@ -815,32 +912,32 @@
                 });
             }
         }
-
+        
         // 加载历史数据
         function loadHistoryData(date) {
             // 显示加载中状态
             document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px;">加载中...</div>';
-
+            
             // 显示返回当前数据按钮
             document.getElementById('current-data-btn').style.display = 'block';
-
+            
             // 设置查看历史数据状态
             isViewingHistory = true;
-
+            
             // 获取历史数据
             fetch(`/api/history/${encodeURIComponent(date)}`)
                 .then(response => response.json())
                 .then(data => {
                     // 更新统计数据
                     updateStats(data);
-
+                    
                     // 渲染测试用例层级列表
                     renderCasesList(data.scenes);
-
+                    
                     // 渲染环形图和柱状图
                     renderDonutChart(data);
                     renderBarChart(data.step_failures);
-
+                    
                     // 添加历史数据标记
                     const title = document.createElement('div');
                     title.style.textAlign = 'center';
@@ -858,48 +955,48 @@
                     document.getElementById('cases-container').innerHTML = '<div style="text-align: center; padding: 20px; color: red;">加载历史数据失败</div>';
                 });
         }
-
+        
         // 加载当前数据
         function loadCurrentData() {
             if (!isViewingHistory) return;
-
+            
             // 隐藏返回当前数据按钮
             document.getElementById('current-data-btn').style.display = 'none';
-
+            
             // 重置查看历史数据状态
             isViewingHistory = false;
-
+            
             // 更新统计数据
             updateStats(currentData.current);
-
+            
             // 渲染测试用例层级列表
             renderCasesList(currentData.current.scenes);
-
+            
             // 渲染环形图和柱状图
             renderDonutChart(currentData.current);
             renderBarChart(currentData.current.step_failures);
         }
-
+        
         // 更新统计数据
         function updateStats(data) {
             document.getElementById('total-count').textContent = data.total;
             document.getElementById('success-count').textContent = data.success;
             document.getElementById('failed-count').textContent = data.failed;
         }
-
-
+        
+        
         // 渲染环形图
         function renderDonutChart(data) {
             const ctx = document.getElementById('donut-chart').getContext('2d');
-
+            
             // 销毁现有图表（如果存在）
             if (window.donutChart) {
                 window.donutChart.destroy();
             }
-
+            
             // 计算成功率
             const passRate = (data.success / (data.success + data.failed + data.skipped) * 100).toFixed(1);
-
+            
             window.donutChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -936,28 +1033,28 @@
                             const status = index === 0 ? 1 : (index === 1 ? 0 : 2);
                             window.currentFilter = status;
                             window.filterCases(status);
-
+                            
                             // 清除失败步骤筛选提示
                             const existingFilter = document.getElementById('filter-notice');
                             if (existingFilter) {
                                 const casesContainer = document.getElementById('cases-container');
                                 casesContainer.removeChild(existingFilter);
                             }
-
+                            
                             document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
                             const boxClass = status === 1 ? 'success' : (status === 0 ? 'failed' : 'skipped');
                             document.querySelector(`.stat-box.${boxClass}`).style.opacity = '1';
                         } else {
                             window.currentFilter = null;
                             window.filterCases(null);
-
+                            
                             // 清除失败步骤筛选提示
                             const existingFilter = document.getElementById('filter-notice');
                             if (existingFilter) {
                                 const casesContainer = document.getElementById('cases-container');
                                 casesContainer.removeChild(existingFilter);
                             }
-
+                            
                             document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '1');
                         }
                     }
@@ -968,34 +1065,34 @@
                         const width = chart.width;
                         const height = chart.height;
                         const ctx = chart.ctx;
-
+                        
                         ctx.restore();
                         ctx.font = 'bold 18px Arial';  // 将字体大小从24px改为18px
                         ctx.textBaseline = 'middle';
                         ctx.textAlign = 'center';
-
+                        
                         // 绘制成功率数值
                         ctx.fillStyle = '#333';
                         ctx.fillText(passRate + '%', width / 2, height / 2);
-
+                        
                         ctx.save();
                     }
                 }]
             });
         }
-
+        
         // 渲染条形图
         function renderBarChart(stepFailures) {
             const ctx = document.getElementById('bar-chart').getContext('2d');
-
+            
             // 销毁现有图表（如果存在）
             if (window.barChart) {
                 window.barChart.destroy();
             }
-
+            
             const steps = stepFailures.map(item => item.step);
             const failures = stepFailures.map(item => item.failures);
-
+            
             window.barChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -1047,17 +1144,17 @@
         function filterScenesByStep(stepName) {
             const scenes = document.querySelectorAll('.scene-item');
             let filteredCount = 0;
-
+            
             // 更新当前筛选状态
             currentStepFilter = stepName;
-
+            
             // 添加筛选提示
             const casesContainer = document.getElementById('cases-container');
             const existingFilter = document.getElementById('filter-notice');
             if (existingFilter) {
                 casesContainer.removeChild(existingFilter);
             }
-
+            
             const filterNotice = document.createElement('div');
             filterNotice.id = 'filter-notice';
             filterNotice.style.padding = '8px';
@@ -1067,11 +1164,11 @@
             filterNotice.style.display = 'flex';
             filterNotice.style.justifyContent = 'space-between';
             filterNotice.style.alignItems = 'center';
-
+            
             const filterText = document.createElement('span');
             filterText.textContent = `当前筛选: 失败步骤 "${stepName}"`;
             filterNotice.appendChild(filterText);
-
+            
             const clearButton = document.createElement('button');
             clearButton.textContent = '清除筛选';
             clearButton.style.padding = '4px 8px';
@@ -1084,29 +1181,48 @@
                 scenes.forEach(scene => scene.style.display = 'block');
                 casesContainer.removeChild(filterNotice);
                 currentStepFilter = null;
+                // 清除所有高亮
+                document.querySelectorAll('.step-item').forEach(step => {
+                    step.style.backgroundColor = '';
+                });
             };
             filterNotice.appendChild(clearButton);
-
+            
             casesContainer.insertBefore(filterNotice, casesContainer.firstChild);
-
+            
             // 筛选场景
             scenes.forEach(scene => {
-                const steps = scene.querySelectorAll('.step-item');
                 let hasFailedStep = false;
-
-                // 移除自动展开功能，只保留筛选功能
-                steps.forEach(step => {
-                    const stepNameElement = step.querySelector('span:nth-child(2)');
-                    if (stepNameElement.textContent === stepName && step.classList.contains('failed')) {
-                        hasFailedStep = true;
-
-                        // 高亮匹配的步骤，但不自动展开
-                        step.style.backgroundColor = 'rgba(231, 76, 60, 0.2)';
-                    } else if (step.style.backgroundColor) {
-                        step.style.backgroundColor = '';
-                    }
-                });
-
+                
+                // 递归检查所有步骤，包括嵌套的步骤
+                function checkSteps(container) {
+                    const steps = container.querySelectorAll(':scope > .step-item');
+                    steps.forEach(step => {
+                        const stepNameElement = step.querySelector('span:nth-child(3)');
+                        if (stepNameElement && stepNameElement.textContent === stepName && step.classList.contains('failed')) {
+                            hasFailedStep = true;
+                            step.style.backgroundColor = 'rgba(231, 76, 60, 0.2)';
+                        } else if (step.style.backgroundColor) {
+                            step.style.backgroundColor = '';
+                        }
+                    });
+                    
+                    // 检查嵌套场景
+                    const nestedScenes = container.querySelectorAll(':scope > .scene-item');
+                    nestedScenes.forEach(nestedScene => {
+                        const stepsContainer = nestedScene.querySelector('.steps-container');
+                        if (stepsContainer) {
+                            checkSteps(stepsContainer);
+                        }
+                    });
+                }
+                
+                // 检查当前场景的步骤
+                const stepsContainer = scene.querySelector('.steps-container');
+                if (stepsContainer) {
+                    checkSteps(stepsContainer);
+                }
+                
                 if (hasFailedStep) {
                     scene.style.display = 'block';
                     filteredCount++;
@@ -1114,7 +1230,7 @@
                     scene.style.display = 'none';
                 }
             });
-
+            
             // 更新筛选提示中的计数
             filterText.textContent = `当前筛选: 失败步骤 "${stepName}" (找到 ${filteredCount} 个场景)`;
         }

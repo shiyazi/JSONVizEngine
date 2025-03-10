@@ -503,6 +503,9 @@
             // 设置查看历史数据状态
             isViewingHistory = true;
             
+            // 保存当前筛选状态，如果未定义则设为null（显示所有）
+            const savedFilter = window.currentFilter !== undefined ? window.currentFilter : null;
+            
             // 获取历史数据
             fetch(`/api/history/${encodeURIComponent(date)}`)
                 .then(response => response.json())
@@ -528,6 +531,20 @@
                     title.style.fontWeight = 'bold';
                     title.innerHTML = `查看历史数据: ${date}`;
                     document.getElementById('cases-container').insertBefore(title, document.getElementById('cases-container').firstChild);
+                    
+                    // 应用筛选条件，确保即使没有之前的筛选状态也能正确显示所有数据
+                    window.currentFilter = savedFilter;
+                    window.filterCases(savedFilter);
+                    
+                    // 更新统计框的高亮状态
+                    if (savedFilter !== null) {
+                        document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
+                        const boxClass = savedFilter === 1 ? 'success' : (savedFilter === 0 ? 'failed' : 'skipped');
+                        document.querySelector(`.stat-box.${boxClass}`).style.opacity = '1';
+                    } else {
+                        // 如果没有筛选条件，所有统计框都保持高亮
+                        document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '1');
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading history data:', error);
@@ -789,7 +806,7 @@
                             data: passRates.map(rate => parseFloat(rate.toFixed(2))),
                             borderColor: '#3498db',
                             backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            tension: 0.4
+                            tension: 0
                         }]
                     },
                     options: {
@@ -855,21 +872,21 @@
                                 data: successCounts,
                                 borderColor: '#2ecc71',
                                 backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                                tension: 0.4
+                                tension: 0
                             },
                             {
                                 label: '失败用例',
                                 data: failedCounts,
                                 borderColor: '#e74c3c',
                                 backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                                tension: 0.4
+                                tension: 0
                             },
                             {
                                 label: '跳过用例',
                                 data: skippedCounts,
                                 borderColor: '#f1c40f',
                                 backgroundColor: 'rgba(241, 196, 15, 0.1)',
-                                tension: 0.4
+                                tension: 0
                             }
                         ]
                     },
@@ -924,6 +941,9 @@
             // 设置查看历史数据状态
             isViewingHistory = true;
             
+            // 保存当前筛选状态，如果未定义则设为null（显示所有）
+            const savedFilter = window.currentFilter !== undefined ? window.currentFilter : null;
+            
             // 获取历史数据
             fetch(`/api/history/${encodeURIComponent(date)}`)
                 .then(response => response.json())
@@ -949,6 +969,20 @@
                     title.style.fontWeight = 'bold';
                     title.innerHTML = `查看历史数据: ${date}`;
                     document.getElementById('cases-container').insertBefore(title, document.getElementById('cases-container').firstChild);
+                    
+                    // 应用筛选条件，确保即使没有之前的筛选状态也能正确显示所有数据
+                    window.currentFilter = savedFilter;
+                    window.filterCases(savedFilter);
+                    
+                    // 更新统计框的高亮状态
+                    if (savedFilter !== null) {
+                        document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '0.5');
+                        const boxClass = savedFilter === 1 ? 'success' : (savedFilter === 0 ? 'failed' : 'skipped');
+                        document.querySelector(`.stat-box.${boxClass}`).style.opacity = '1';
+                    } else {
+                        // 如果没有筛选条件，所有统计框都保持高亮
+                        document.querySelectorAll('.stat-box').forEach(box => box.style.opacity = '1');
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading history data:', error);
@@ -1128,6 +1162,13 @@
                                     return label.length > 30 ? label.substr(0, 27) + '...' : label;
                                 }
                             }
+                        },
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1,
+                                precision: 0
+                            }
                         }
                     },
                     onClick: (event, elements) => {
@@ -1142,8 +1183,10 @@
         }
 
         function filterScenesByStep(stepName) {
-            const scenes = document.querySelectorAll('.scene-item');
+            // 选择直接在cases-container下的场景元素（顶级场景）
+            const scenes = document.querySelectorAll('#cases-container > .scene-item');
             let filteredCount = 0;
+            let topLevelSceneIds = new Set(); // 用于存储匹配的顶级场景ID
             
             // 更新当前筛选状态
             currentStepFilter = stepName;
@@ -1190,8 +1233,13 @@
             
             casesContainer.insertBefore(filterNotice, casesContainer.firstChild);
             
+            // 清除所有高亮
+            document.querySelectorAll('.step-item').forEach(step => {
+                step.style.backgroundColor = '';
+            });
+            
             // 筛选场景
-            scenes.forEach(scene => {
+            scenes.forEach((scene, index) => {
                 let hasFailedStep = false;
                 
                 // 递归检查所有步骤，包括嵌套的步骤
@@ -1202,8 +1250,7 @@
                         if (stepNameElement && stepNameElement.textContent === stepName && step.classList.contains('failed')) {
                             hasFailedStep = true;
                             step.style.backgroundColor = 'rgba(231, 76, 60, 0.2)';
-                        } else if (step.style.backgroundColor) {
-                            step.style.backgroundColor = '';
+                            topLevelSceneIds.add(index);
                         }
                     });
                     
@@ -1223,16 +1270,21 @@
                     checkSteps(stepsContainer);
                 }
                 
+                // 显示或隐藏整个顶级场景
                 if (hasFailedStep) {
                     scene.style.display = 'block';
+                    // 确保所有嵌套场景都显示
+                    scene.querySelectorAll('.scene-item').forEach(nestedScene => {
+                        nestedScene.style.display = 'block';
+                    });
                     filteredCount++;
                 } else {
                     scene.style.display = 'none';
                 }
             });
             
-            // 更新筛选提示中的计数
-            filterText.textContent = `当前筛选: 失败步骤 "${stepName}" (找到 ${filteredCount} 个场景)`;
+            // 更新筛选提示中的计数，使用顶级场景的数量
+            filterText.textContent = `当前筛选: 失败步骤 "${stepName}" (找到 ${topLevelSceneIds.size} 个场景)`;
         }
     </script>
 </body>

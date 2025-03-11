@@ -2,3 +2,6 @@ __pycache__/app.cpython-313.pyc
 __pycache__/main.cpython-313.pyc
 result.json
 result/
+/logs
+/.vscode/
+/.idea/
